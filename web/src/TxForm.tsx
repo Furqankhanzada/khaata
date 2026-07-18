@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api } from './api'
+import { api, todayLocal } from './api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -35,7 +35,7 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
   const [amount, setAmount] = useState(existing ? String(Number(existing.amount)) : '')
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null)
   const [note, setNote] = useState(existing?.note ?? '')
-  const [date, setDate] = useState(existing?.occurredOn ?? new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(existing?.occurredOn ?? todayLocal())
   const [busy, setBusy] = useState(false)
 
   const cats = (categories.data ?? []).filter((c) => c.kind === type)

@@ -25,6 +25,9 @@ export async function api<T = unknown>(path: string, opts?: RequestInit & { json
   return res.json() as Promise<T>
 }
 
+/** Today's local date as YYYY-MM-DD (toISOString would give UTC — a day behind PKT every evening). */
+export const todayLocal = () => new Date().toLocaleDateString('en-CA')
+
 export const rupees = new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 })
 export const fmt = (n: number | string | null | undefined) =>
   n == null ? '—' : `Rs ${rupees.format(Number(n))}`

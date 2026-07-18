@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ChartColumn, ChevronLeft, ChevronRight } from 'lucide-react'
-import { api } from '../api'
+import { api, todayLocal } from '../api'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -30,7 +30,7 @@ const monthLabel = (m: string) =>
   new Date(`${m}-01T00:00:00`).toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
 
 export default function Dashboard() {
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [month, setMonth] = useState(todayLocal().slice(0, 7))
   const report = useQuery({ queryKey: ['report', month], queryFn: () => api<Report>(`/reports/monthly?month=${month}`) })
   const r = report.data
 
