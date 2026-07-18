@@ -1,0 +1,28 @@
+import path from 'node:path'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
+
+export default defineConfig({
+  resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      manifest: {
+        name: 'Khaata — ghar ka hisaab',
+        short_name: 'Khaata',
+        description: 'The household ledger: expenses, budgets, portfolio, zakat',
+        theme_color: '#0b5540',
+        background_color: '#fafaf7',
+        display: 'standalone',
+        icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+      },
+      workbox: { navigateFallbackDenylist: [/^\/api/, /^\/mcp/] },
+    }),
+  ],
+  build: { outDir: '../dist/public', emptyOutDir: true },
+  server: { proxy: { '/api': 'http://localhost:3001', '/mcp': 'http://localhost:3001' } },
+})
