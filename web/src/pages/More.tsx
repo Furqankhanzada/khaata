@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTheme } from 'next-themes'
 import { Copy, Plus, RotateCw } from 'lucide-react'
@@ -17,6 +18,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Amount, Confirm, PageHeader } from '@/components/shared'
 import type { Me } from '../App'
+import type { Loan } from './Loans'
 
 function copyText(text: string, what: string) {
   navigator.clipboard.writeText(text).then(
@@ -229,78 +231,36 @@ function AccountsSection() {
   )
 }
 
-type Loan = { id: string; counterparty: string; direction: 'lent' | 'borrowed'; principal: string; outstanding: number; status: string }
-const DIRECTIONS = [
-  { value: 'lent', label: 'I lent' },
-  { value: 'borrowed', label: 'I borrowed' },
-]
 function LoansSection() {
-  const qc = useQueryClient()
-  const loans = useQuery({ queryKey: ['loans'], queryFn: () => api<Loan[]>('/loans?status=open') })
-  const [form, setForm] = useState({ counterparty: '', direction: 'lent', principal: '' })
-  const [paying, setPaying] = useState<{ id: string; amount: string } | null>(null)
-  const inval = () => qc.invalidateQueries({ queryKey: ['loans'] })
+  const loans = useQuery({ queryKey: ['loans', 'open'], queryFn: () => api<Loan[]>('/loans?status=open') })
+  const open = loans.data ?? []
+  const owedToUs = open.filter((l) => l.direction === 'lent').reduce((s, l) => s + l.outstanding, 0)
+  const weOwe = open.filter((l) => l.direction === 'borrowed').reduce((s, l) => s + l.outstanding, 0)
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Loans / Qarz</CardTitle>
-        <CardDescription>Money lent or borrowed, settled as repayments come in.</CardDescription>
+        <CardDescription>
+          {open.length === 0 ? 'No open loans.' : `${open.length} open loan${open.length > 1 ? 's' : ''}`}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {(loans.data ?? []).length === 0 && <p className="text-sm text-muted-foreground">No open loans.</p>}
-        {(loans.data ?? []).map((l) => (
-          <div key={l.id} className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-sm">
-                {l.counterparty}
-                <Badge variant={l.direction === 'borrowed' ? 'destructive' : 'secondary'}>
-                  {l.direction === 'lent' ? 'owes us' : 'we owe'}
-                </Badge>
-              </span>
-              <Amount value={l.outstanding} className={cn('text-sm', l.direction === 'borrowed' && 'text-outflow')} />
-            </div>
-            {paying?.id === l.id ? (
-              <form className="flex items-center gap-1.5" onSubmit={async (e) => {
-                e.preventDefault()
-                await api(`/loans/${l.id}/payments`, { method: 'POST', json: { amount: Number(paying.amount) } })
-                setPaying(null); inval(); toast('Repayment recorded')
-              }}>
-                <InputGroup className="flex-1">
-                  <InputGroupAddon>Rs</InputGroupAddon>
-                  <InputGroupInput type="number" min="1" autoFocus required placeholder="Repayment amount"
-                    className="amount" value={paying.amount} onChange={(e) => setPaying({ ...paying, amount: e.target.value })} />
-                </InputGroup>
-                <Button type="submit" size="sm">Record</Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setPaying(null)}>Cancel</Button>
-              </form>
-            ) : (
-              <Button variant="outline" size="sm" className="self-start" onClick={() => setPaying({ id: l.id, amount: '' })}>
-                Record repayment
-              </Button>
-            )}
+      <CardContent className="flex flex-col gap-2">
+        {owedToUs > 0 && (
+          <div className="flex items-baseline justify-between text-sm">
+            <span className="text-muted-foreground">They owe us</span>
+            <Amount value={owedToUs} flow="in" className="text-sm" />
           </div>
-        ))}
-        <form className="flex flex-col gap-2" onSubmit={async (e) => {
-          e.preventDefault()
-          await api('/loans', { method: 'POST', json: { counterparty: form.counterparty, direction: form.direction, principal: Number(form.principal) } })
-          setForm({ counterparty: '', direction: 'lent', principal: '' }); inval(); toast('Loan added')
-        }}>
-          <div className="flex gap-2">
-            <Select items={DIRECTIONS} value={form.direction} onValueChange={(v) => setForm({ ...form, direction: v as string })}>
-              <SelectTrigger className="w-32 shrink-0"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {DIRECTIONS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <Input placeholder="Person" required value={form.counterparty} onChange={(e) => setForm({ ...form, counterparty: e.target.value })} />
-            <Input type="number" min="1" placeholder="Rs" required className="amount w-24"
-              value={form.principal} onChange={(e) => setForm({ ...form, principal: e.target.value })} />
+        )}
+        {weOwe > 0 && (
+          <div className="flex items-baseline justify-between text-sm">
+            <span className="text-muted-foreground">We owe</span>
+            <Amount value={weOwe} flow="out" className="text-sm" />
           </div>
-          <Button type="submit" variant="outline" size="sm">Add loan</Button>
-        </form>
+        )}
+        <Button variant="outline" size="sm" render={<Link to="/loans" />}>
+          Open loans page
+        </Button>
       </CardContent>
     </Card>
   )

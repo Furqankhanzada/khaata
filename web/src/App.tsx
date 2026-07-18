@@ -10,6 +10,7 @@ import { TxForm } from './TxForm'
 import { HouseholdSetup, Login } from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Reports from './pages/Reports'
+import Loans from './pages/Loans'
 import Transactions from './pages/Transactions'
 import Budgets from './pages/Budgets'
 import Portfolio from './pages/Portfolio'
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/loans" element={<Loans />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/more" element={<More me={me.data} />} />
           <Route path="*" element={<Navigate to="/" replace />} />

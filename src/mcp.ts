@@ -69,6 +69,10 @@ function buildServer(ctx: Ctx) {
   tool('record_loan_payment', 'Record a repayment against a loan (auto-settles when fully repaid).',
     { loan_id: z.string(), ...loans.loanPaymentInput.shape },
     async (a: { loan_id: string }) => (await loans.addLoanPayment(ctx, a.loan_id, loans.loanPaymentInput.parse(a))) ?? { error: 'not found' })
+  tool('update_loan', 'Settle a loan (any remainder counts as forgiven), reopen it, or update its note.',
+    { loan_id: z.string(), status: z.enum(['open', 'settled']).optional(), note: z.string().optional() },
+    async (a: { loan_id: string; status?: 'open' | 'settled'; note?: string }) =>
+      (await loans.updateLoan(ctx, a.loan_id, { status: a.status, note: a.note })) ?? { error: 'not found' })
 
   tool('add_recurring', 'Create a recurring monthly bill/income rule (auto-logged on its due day).',
     recurring.recurringInput.shape, (a) => recurring.addRecurring(ctx, recurring.recurringInput.parse(a)))
