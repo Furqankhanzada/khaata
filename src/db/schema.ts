@@ -39,7 +39,11 @@ export const transactions = pgTable('transactions', {
   householdId: text('household_id').notNull().references(() => households.id),
   userId: text('user_id').notNull().references(() => user.id),
   type: text('type', { enum: ['expense', 'income'] }).notNull(),
-  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(), // always PKR
+  // set only for foreign entries: amount = original_amount × fx_rate, locked at entry
+  originalAmount: numeric('original_amount', { precision: 14, scale: 2 }),
+  originalCurrency: text('original_currency'),
+  fxRate: numeric('fx_rate', { precision: 18, scale: 8 }),
   categoryId: text('category_id').references(() => categories.id),
   note: text('note'),
   occurredOn: date('occurred_on').notNull(),
@@ -60,7 +64,8 @@ export const accounts = pgTable('accounts', {
   householdId: text('household_id').notNull().references(() => households.id),
   userId: text('user_id').references(() => user.id), // owner; null = visible to all (legacy safety)
   name: text('name').notNull(),
-  balance: numeric('balance', { precision: 14, scale: 2 }).notNull().default('0'),
+  balance: numeric('balance', { precision: 14, scale: 2 }).notNull().default('0'), // in `currency`
+  currency: text('currency').notNull().default('PKR'),
   zakatable: boolean('zakatable').notNull().default(true),
   visibility: text('visibility', { enum: ['shared', 'private'] }).notNull().default('private'),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -114,6 +119,14 @@ export const loanPayments = pgTable('loan_payments', {
   paidOn: date('paid_on').notNull(),
   note: text('note'),
 })
+
+// rate = PKR (base) units per 1 quote unit; the er-api response is base→quote, so invert on ingest
+export const fxRates = pgTable('fx_rates', {
+  base: text('base').notNull(),
+  quote: text('quote').notNull(),
+  asOf: date('as_of').notNull(),
+  rate: numeric('rate', { precision: 18, scale: 8 }).notNull(),
+}, (t) => [primaryKey({ columns: [t.base, t.quote, t.asOf] })])
 
 export const zakatSettings = pgTable('zakat_settings', {
   householdId: text('household_id').primaryKey().references(() => households.id),

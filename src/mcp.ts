@@ -11,6 +11,7 @@ import * as loans from './services/loans'
 import * as recurring from './services/recurring'
 import * as accounts from './services/accounts'
 import * as zakat from './services/zakat'
+import * as fx from './services/fx'
 
 const json = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 1) }] })
 
@@ -20,7 +21,7 @@ function buildServer(ctx: Ctx) {
   const tool = (name: string, description: string, shape: z.ZodRawShape, handler: (args: any) => Promise<unknown>) =>
     server.registerTool(name, { description, inputSchema: shape }, async (args) => json(await handler(args)))
 
-  tool('add_transaction', 'Record an expense or income in the household ledger (amounts in PKR). The payer is the owner of the API key.',
+  tool('add_transaction', "Record an expense or income in the household ledger. Amounts are PKR by default; for foreign spending pass currency (e.g. amount: 20, currency: 'USD' for $20 spent in Dubai) — it's converted to PKR once at the day's rate (or an explicit fx_rate) and the original is preserved. The payer is the owner of the API key.",
     tx.transactionInput.shape, (a) => tx.addTransaction(ctx, a))
   tool('list_transactions', 'List/search household transactions with optional date, type, category, member and text filters.',
     tx.transactionFilters.shape, (a) => tx.listTransactions(ctx, tx.transactionFilters.parse(a)))
@@ -61,7 +62,7 @@ function buildServer(ctx: Ctx) {
     async (a: { holding_id: string }) => (await portfolio.updateHolding(ctx, a.holding_id, portfolio.holdingUpdate.parse(a))) ?? { error: 'not found' })
   tool('record_price', 'Manually record a price/NAV/valuation for an instrument (wins over auto-fetched prices).',
     portfolio.priceInput.shape, (a) => portfolio.recordPrice(portfolio.priceInput.parse(a)))
-  tool('refresh_prices', 'Fetch latest PSX closing prices and MUFAP fund NAVs now.', {}, () => portfolio.refreshPrices())
+  tool('refresh_prices', 'Fetch latest market data now: PSX closing prices, MUFAP fund NAVs, and exchange rates.', {}, () => portfolio.refreshPrices())
 
   tool('add_loan', 'Record money lent to or borrowed from someone (qarz).', loans.loanInput.shape, (a) => loans.addLoan(ctx, loans.loanInput.parse(a)))
   tool('list_loans', 'List loans visible to you (your own + household-shared) with outstanding amounts; filter by status open|settled.',
@@ -86,11 +87,13 @@ function buildServer(ctx: Ctx) {
     { id: z.string(), ...recurring.recurringUpdate.shape },
     async (a: { id: string }) => (await recurring.updateRecurring(ctx, a.id, recurring.recurringUpdate.parse(a))) ?? { error: 'not found' })
 
-  tool('list_accounts', 'List cash/bank accounts visible to you (your own + household-shared) with snapshot balances.', {}, () => accounts.listAccounts(ctx))
-  tool('update_account_balance', 'Update a cash/bank account balance snapshot (or other fields).',
+  tool('list_accounts', "List cash/bank accounts visible to you (your own + household-shared). Balances are in each account's own currency; base_balance/rate give the PKR value at the latest exchange rate.", {}, () => accounts.listAccounts(ctx))
+  tool('update_account_balance', "Update a cash/bank account's balance snapshot (in its own currency) or other fields.",
     { account_id: z.string(), ...accounts.accountUpdate.shape },
     async (a: { account_id: string }) => (await accounts.updateAccount(ctx, a.account_id, accounts.accountUpdate.parse(a))) ?? { error: 'not found' })
-  tool('add_account', 'Create a cash/bank account.', accounts.accountInput.shape, (a) => accounts.addAccount(ctx, accounts.accountInput.parse(a)))
+  tool('add_account', "Create a cash/bank account. Use currency for foreign-currency balances (e.g. 'USD' for Payoneer/Upwork).", accounts.accountInput.shape, (a) => accounts.addAccount(ctx, accounts.accountInput.parse(a)))
+  tool('record_fx_rate', 'Manually record an exchange rate (PKR per 1 unit of the currency) — used when the daily feed is wrong or unavailable.',
+    fx.fxRateInput.shape, (a) => fx.recordFxRate(fx.fxRateInput.parse(a)))
 
   tool('get_zakat_summary', 'Zakatable assets visible to you (your own + household-shared) vs nisab, and the computed 2.5% zakat due.', {}, () => zakat.zakatSummary(ctx))
   tool('set_zakat_settings', 'Set the nisab threshold (PKR) and next zakat due date.',

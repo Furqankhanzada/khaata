@@ -7,16 +7,22 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 
-/** Ledger amount: IBM Plex Mono, tabular. flow colors it (in = green, out = crimson). */
+export const CURRENCIES = ['PKR', 'USD', 'AED', 'MYR', 'TRY', 'SAR', 'EUR', 'GBP']
+
+const foreignFmt = (currency: string) =>
+  new Intl.NumberFormat('en', { style: 'currency', currency, maximumFractionDigits: 2 })
+
+/** Ledger amount: IBM Plex Mono, tabular. flow colors it; currency ≠ PKR uses Intl symbols ($1,000). */
 export function Amount({
-  value, flow, signed = false, className,
-}: { value: number | string | null | undefined; flow?: 'in' | 'out'; signed?: boolean; className?: string }) {
+  value, flow, signed = false, currency, className,
+}: { value: number | string | null | undefined; flow?: 'in' | 'out'; signed?: boolean; currency?: string; className?: string }) {
   if (value == null) return <span className={cn('amount text-muted-foreground', className)}>—</span>
   const n = Number(value)
   const sign = signed ? (flow === 'out' ? '−' : '+') : n < 0 ? '−' : ''
+  const body = currency && currency !== 'PKR' ? foreignFmt(currency).format(Math.abs(n)) : `Rs ${rupees.format(Math.abs(n))}`
   return (
     <span className={cn('amount', flow === 'in' && 'text-inflow', flow === 'out' && 'text-outflow', className)}>
-      {sign}Rs {rupees.format(Math.abs(n))}
+      {sign}{body}
     </span>
   )
 }

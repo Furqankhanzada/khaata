@@ -10,11 +10,12 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Spinner } from '@/components/ui/spinner'
-import { Confirm } from '@/components/shared'
+import { CURRENCIES, Confirm } from '@/components/shared'
 
 export type Category = { id: string; name: string; kind: 'expense' | 'income' }
 export type Tx = {
   id: string; type: 'expense' | 'income'; amount: string; categoryId: string | null
+  originalAmount: string | null; originalCurrency: string | null; fxRate: string | null
   category: string | null; note: string | null; occurredOn: string; source: string; userId: string; paidBy: string
 }
 
@@ -32,7 +33,9 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
   const qc = useQueryClient()
   const categories = useCategories()
   const [type, setType] = useState<'expense' | 'income'>(existing?.type ?? 'expense')
-  const [amount, setAmount] = useState(existing ? String(Number(existing.amount)) : '')
+  const [amount, setAmount] = useState(existing ? String(Number(existing.originalAmount ?? existing.amount)) : '')
+  const [currency, setCurrency] = useState(existing?.originalCurrency ?? 'PKR')
+  const [rate, setRate] = useState(existing?.fxRate ? String(Number(existing.fxRate)) : '')
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null)
   const [note, setNote] = useState(existing?.note ?? '')
   const [date, setDate] = useState(existing?.occurredOn ?? todayLocal())
@@ -43,7 +46,11 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
-    const body = { type, amount: Number(amount), category_id: categoryId || undefined, note: note || undefined, occurred_on: date }
+    const body = {
+      type, amount: Number(amount), category_id: categoryId || undefined, note: note || undefined, occurred_on: date,
+      currency: currency !== 'PKR' ? currency : undefined,
+      fx_rate: currency !== 'PKR' && rate ? Number(rate) : undefined,
+    }
     try {
       if (existing) await api(`/transactions/${existing.id}`, { method: 'PATCH', json: body })
       else await api('/transactions', { method: 'POST', json: body })
@@ -85,12 +92,32 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
         <Field>
           <FieldLabel htmlFor="tx-amount">Amount</FieldLabel>
           <InputGroup>
-            <InputGroupAddon>Rs</InputGroupAddon>
+            <InputGroupAddon>
+              <select
+                aria-label="Currency"
+                className="amount bg-transparent text-sm outline-none"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+              >
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c === 'PKR' ? 'Rs' : c}</option>)}
+              </select>
+            </InputGroupAddon>
             <InputGroupInput
               id="tx-amount" type="number" inputMode="decimal" step="0.01" min="0.01" required
               className="amount" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)}
             />
           </InputGroup>
+          {currency !== 'PKR' && (
+            <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="shrink-0">1 {currency} =</span>
+              <InputGroup className="w-32">
+                <InputGroupAddon>Rs</InputGroupAddon>
+                <InputGroupInput type="number" step="any" min="0.0001" placeholder="auto"
+                  className="amount" value={rate} onChange={(e) => setRate(e.target.value)} />
+              </InputGroup>
+              <span>leave blank for today's rate</span>
+            </div>
+          )}
         </Field>
 
         <div className="grid grid-cols-2 gap-3">

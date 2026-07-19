@@ -7,6 +7,7 @@ import type { Ctx } from '../middleware'
 import { visibilityInput } from './accounts'
 import { fetchPsxClose } from './prices/psx'
 import { fetchMufapNavs, norm } from './prices/mufap'
+import { refreshFxRates } from './fx'
 
 export const instrumentInput = z.object({
   kind: z.enum(['psx_stock', 'mutual_fund', 'other']),
@@ -189,5 +190,8 @@ export async function refreshPrices() {
 
   result.skipped = held.length - result.updated
   if (result.errors.length) console.warn('[prices]', result.errors.join('; '))
-  return result
+  // one "refresh market data" action: prices + FX rates together
+  const fx = await refreshFxRates()
+  if (fx.error) result.errors.push(`FX: ${fx.error}`)
+  return { ...result, fx_rates_updated: fx.updated }
 }

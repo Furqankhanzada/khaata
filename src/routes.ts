@@ -13,6 +13,7 @@ import * as loans from './services/loans'
 import * as recurring from './services/recurring'
 import * as accounts from './services/accounts'
 import * as zakat from './services/zakat'
+import * as fx from './services/fx'
 
 // ponytail: single routes file — every handler is parse → service → json
 export const api = new Hono<AuthEnv>()
@@ -93,6 +94,7 @@ api.delete('/holdings/:id', async (c) => {
 })
 api.post('/prices', async (c) => c.json(await portfolio.recordPrice(portfolio.priceInput.parse(await c.req.json())), 201))
 api.post('/prices/refresh', async (c) => c.json(await portfolio.refreshPrices()))
+api.post('/fx/rates', async (c) => c.json(await fx.recordFxRate(fx.fxRateInput.parse(await c.req.json())), 201))
 
 api.get('/loans', async (c) => c.json(await loans.listLoans(hctx(c), c.req.query('status') as 'open' | 'settled' | undefined)))
 api.post('/loans', async (c) => c.json(await loans.addLoan(hctx(c), loans.loanInput.parse(await c.req.json())), 201))

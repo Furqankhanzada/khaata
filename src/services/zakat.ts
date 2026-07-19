@@ -23,9 +23,14 @@ export async function setZakatSettings(ctx: Ctx, input: z.infer<typeof zakatSett
 
 export async function zakatSummary(ctx: Ctx) {
   const accounts = await db.execute(sql`
-    select name, balance::float8 as value from accounts
-    where household_id = ${ctx.householdId} and zakatable = true
-      and (visibility = 'shared' or user_id = ${ctx.userId} or user_id is null)`)
+    select a.name, a.currency, a.balance::float8 as native_balance,
+           round(a.balance * (case when a.currency = 'PKR' then 1 else fx.rate end), 2)::float8 as value
+    from accounts a
+    left join lateral (
+      select rate from fx_rates where base = 'PKR' and quote = a.currency order by as_of desc limit 1
+    ) fx on a.currency != 'PKR'
+    where a.household_id = ${ctx.householdId} and a.zakatable = true
+      and (a.visibility = 'shared' or a.user_id = ${ctx.userId} or a.user_id is null)`)
   const investments = await db.execute(sql`
     select i.name, (h.units * p.price)::float8 as value, p.as_of::text as price_as_of
     from holdings h

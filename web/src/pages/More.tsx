@@ -16,7 +16,7 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Amount, Confirm, PageHeader, ShareSwitch } from '@/components/shared'
+import { Amount, CURRENCIES, Confirm, PageHeader, ShareSwitch } from '@/components/shared'
 import type { Me } from '../App'
 import type { Loan } from './Loans'
 
@@ -181,11 +181,14 @@ function ApiKeysSection() {
   )
 }
 
-type Account = { id: string; name: string; balance: string; zakatable: boolean; visibility: 'shared' | 'private' }
+type Account = {
+  id: string; name: string; balance: number; currency: string; zakatable: boolean
+  visibility: 'shared' | 'private'; rate: number | null; base_balance: number | null; rate_as_of: string | null
+}
 function AccountsSection() {
   const qc = useQueryClient()
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: () => api<Account[]>('/accounts') })
-  const [form, setForm] = useState({ name: '', balance: '' })
+  const [form, setForm] = useState({ name: '', balance: '', currency: 'PKR' })
   const [shared, setShared] = useState(false)
   const [editing, setEditing] = useState<{ id: string; balance: string } | null>(null)
   const inval = () => { qc.invalidateQueries({ queryKey: ['accounts'] }); qc.invalidateQueries({ queryKey: ['zakat'] }) }
@@ -199,9 +202,19 @@ function AccountsSection() {
       <CardContent className="flex flex-col gap-2">
         {(accounts.data ?? []).map((a) => (
           <div key={a.id} className="flex min-h-9 items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-sm">
-              {a.name}
-              {a.visibility === 'shared' && <Badge variant="outline">shared</Badge>}
+            <span className="flex flex-col">
+              <span className="flex items-center gap-1.5 text-sm">
+                {a.name}
+                {a.currency !== 'PKR' && <Badge variant="secondary" className="amount">{a.currency}</Badge>}
+                {a.visibility === 'shared' && <Badge variant="outline">shared</Badge>}
+              </span>
+              {a.currency !== 'PKR' && (
+                <span className="text-xs text-muted-foreground">
+                  {a.rate != null
+                    ? <>@ {a.rate.toFixed(2)} ≈ <Amount value={a.base_balance} className="text-xs" /></>
+                    : 'rate unavailable — record one'}
+                </span>
+              )}
             </span>
             {editing?.id === a.id ? (
               <form className="flex items-center gap-1.5" onSubmit={async (e) => {
@@ -226,7 +239,7 @@ function AccountsSection() {
               </form>
             ) : (
               <button className="text-sm" onClick={() => setEditing({ id: a.id, balance: String(Number(a.balance)) })}>
-                <Amount value={a.balance} className="text-sm" />
+                <Amount value={a.balance} currency={a.currency} className="text-sm" />
               </button>
             )}
           </div>
@@ -235,13 +248,20 @@ function AccountsSection() {
           e.preventDefault()
           await api('/accounts', {
             method: 'POST',
-            json: { name: form.name, balance: Number(form.balance || 0), visibility: shared ? 'shared' : 'private' },
+            json: { name: form.name, balance: Number(form.balance || 0), currency: form.currency, visibility: shared ? 'shared' : 'private' },
           })
-          setForm({ name: '', balance: '' }); setShared(false); inval(); toast('Account added')
+          setForm({ name: '', balance: '', currency: 'PKR' }); setShared(false); inval(); toast('Account added')
         }}>
           <div className="flex gap-2">
             <Input placeholder="Account name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <Input type="number" placeholder="Rs 0" className="amount w-24" value={form.balance}
+            <select
+              aria-label="Currency"
+              className="amount rounded-lg border border-input bg-transparent px-2 text-sm"
+              value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}
+            >
+              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <Input type="number" placeholder="0" className="amount w-24" value={form.balance}
               onChange={(e) => setForm({ ...form, balance: e.target.value })} />
             <Button type="submit" variant="outline" size="icon" aria-label="Add account"><Plus /></Button>
           </div>
@@ -359,7 +379,10 @@ function RecurringSection() {
 type Zakat = {
   zakatable_base: number; nisab_amount: number | null; above_nisab: boolean | null
   zakat_due: number; next_due_date: string | null
-  zakatable_assets: { accounts: { name: string; value: number }[]; investments: { name: string; value: number | null }[] }
+  zakatable_assets: {
+    accounts: { name: string; value: number | null; currency?: string; native_balance?: number }[]
+    investments: { name: string; value: number | null }[]
+  }
   deductible_debts: { counterparty: string; value: number }[]
 }
 function ZakatSection() {
@@ -394,7 +417,15 @@ function ZakatSection() {
             <summary className="cursor-pointer text-primary">Breakdown</summary>
             <div className="mt-1 flex flex-col">
               {z.zakatable_assets.accounts.map((a) => (
-                <div key={a.name} className="flex justify-between border-t py-1.5"><span>{a.name}</span><Amount value={a.value} className="text-sm" /></div>
+                <div key={a.name} className="flex justify-between border-t py-1.5">
+                  <span>
+                    {a.name}
+                    {a.currency && a.currency !== 'PKR' && (
+                      <span className="text-muted-foreground"> (<Amount value={a.native_balance} currency={a.currency} className="text-xs" />)</span>
+                    )}
+                  </span>
+                  <Amount value={a.value} className="text-sm" />
+                </div>
               ))}
               {z.zakatable_assets.investments.map((a) => (
                 <div key={a.name} className="flex justify-between border-t py-1.5"><span>{a.name}</span><Amount value={a.value} className="text-sm" /></div>

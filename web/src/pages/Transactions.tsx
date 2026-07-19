@@ -75,6 +75,12 @@ export default function Transactions() {
                         {t.source === 'recurring' && <Badge variant="secondary">auto</Badge>}
                       </div>
                       <div className="truncate text-xs text-muted-foreground">
+                        {t.originalCurrency && (
+                          <>
+                            <Amount value={t.originalAmount} currency={t.originalCurrency} className="text-xs" />
+                            {' @ '}{Number(t.fxRate).toFixed(2)}{' · '}
+                          </>
+                        )}
                         {t.note ? `${t.note} · ` : ''}{t.paidBy}
                       </div>
                     </div>
