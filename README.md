@@ -1,7 +1,8 @@
 # Hamara Hisaab — ghar ka sara hisaab, ek jagah
 
-Self-hosted household finance app for Pakistan: shared expense/income ledger, budgets,
-PSX + mutual fund portfolio, loans (qarz), recurring bills and a zakat helper.
+Self-hosted household finance app: shared expense/income ledger, budgets, an investment
+portfolio (with automatic PSX + Pakistani mutual fund prices), loans (qarz), recurring
+bills and a zakat helper.
 **API-first**: everything the web app can do, any AI agent can do too — via MCP or plain REST.
 
 ## Stack
