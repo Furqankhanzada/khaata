@@ -67,14 +67,14 @@ export default function Transactions() {
                   <button
                     key={t.id}
                     onClick={() => setEditing(t)}
-                    className={cn('flex w-full items-center justify-between gap-3 px-4 py-3 text-left active:bg-accent', i > 0 && 'border-t')}
+                    className={cn('flex w-full items-start justify-between gap-3 px-4 py-3 text-left active:bg-accent', i > 0 && 'border-t')}
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 text-sm font-medium">
                         <span className="truncate">{t.category ?? 'Uncategorized'}</span>
                         {t.source === 'recurring' && <Badge variant="secondary">auto</Badge>}
                       </div>
-                      <div className="truncate text-xs text-muted-foreground">
+                      <div className="text-xs break-words text-muted-foreground">
                         {t.originalCurrency && (
                           <>
                             <Amount value={t.originalAmount} currency={t.originalCurrency} className="text-xs" />
