@@ -1,19 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- full-bleed source: iOS masks its own corners, Android maskable uses the safe centre -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#0b6d51"/>
       <stop offset="1" stop-color="#064834"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- HH monogram: three white verticals (two H's sharing the middle stroke) -->
   <g fill="#f4faf7">
     <rect x="118" y="150" width="44" height="212" rx="12"/>
     <rect x="234" y="150" width="44" height="212" rx="12"/>
     <rect x="350" y="150" width="44" height="212" rx="12"/>
   </g>
+
+  <!-- full-width teal crossbars, stepping up: read as HH bars AND a rising chart (growth) -->
   <g fill="#5eead4">
     <rect x="118" y="284" width="160" height="42" rx="12"/>
     <rect x="234" y="196" width="160" height="42" rx="12"/>
   </g>
+
+  <!-- ledger baseline tick -->
   <rect x="150" y="392" width="212" height="16" rx="8" fill="#5eead4" opacity="0.5"/>
 </svg>

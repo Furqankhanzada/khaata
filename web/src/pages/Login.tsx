@@ -11,7 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 function Brand() {
   return (
     <div className="mb-6 flex flex-col items-center gap-3">
-      <div className="amount flex size-14 items-center justify-center rounded-2xl bg-primary text-3xl font-semibold text-primary-foreground">₨</div>
+      <img src="/icon.svg" alt="Hamara Hisaab" className="size-14 rounded-2xl" />
       <div className="text-center">
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Hamara Hisaab</h1>
         <p className="text-sm text-muted-foreground">Expenses, budgets & investments — sab ek jagah</p>
