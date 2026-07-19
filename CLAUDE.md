@@ -4,6 +4,7 @@
 
 - **Every behavior change lands with tests in the same commit.** Backend/API changes extend or adjust `test/integration/*.test.ts` (API-level, real Postgres, in-process app); UI-flow changes extend or adjust `e2e/*.spec.ts` (Playwright). Changed behavior means changed assertions — never delete a failing test to make a change pass without understanding why.
 - Run `npm test` before every commit; also `npm run test:e2e` when the web UI changed.
+- **New interactive UI controls need interaction-level assertions, not just end-state.** `selectOption()`/`fill()` bypass the real interaction, so a flow can pass while the control is broken for humans (a native select popup closing instantly was missed this way). Assert proxy signals too: focus retention after click, `aria-expanded`, visible options.
 - Parser/fetcher logic (PSX, MUFAP, FX) is tested with stubbed `fetch` fixtures in `test/unit/` — tests never hit the network.
 
 ## Architecture rules
