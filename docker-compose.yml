@@ -18,7 +18,9 @@ services:
   app:
     build: .
     ports:
-      - "${APP_PORT:-3000}:3000"
+      # localhost-only: the public front door is the Cloudflare tunnel (internal app:3000);
+      # this host port exists just for local access from this machine
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgres://finance:${DB_PASSWORD:-finance}@db:5432/finance
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
