@@ -13,8 +13,8 @@ function Brand() {
     <div className="mb-6 flex flex-col items-center gap-3">
       <div className="amount flex size-14 items-center justify-center rounded-2xl bg-primary text-3xl font-semibold text-primary-foreground">₨</div>
       <div className="text-center">
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">Khaata</h1>
-        <p className="text-sm text-muted-foreground">Ghar ka hisaab, ek jagah — expenses, budgets & investments</p>
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">Hamara Hisaab</h1>
+        <p className="text-sm text-muted-foreground">Expenses, budgets & investments — sab ek jagah</p>
       </div>
     </div>
   )

@@ -15,7 +15,7 @@ import * as zakat from './services/zakat'
 const json = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 1) }] })
 
 function buildServer(ctx: Ctx) {
-  const server = new McpServer({ name: 'khaata', version: '1.0.0' })
+  const server = new McpServer({ name: 'hamara-hisaab', version: '1.0.0' })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tool = (name: string, description: string, shape: z.ZodRawShape, handler: (args: any) => Promise<unknown>) =>
     server.registerTool(name, { description, inputSchema: shape }, async (args) => json(await handler(args)))

@@ -12,8 +12,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Khaata — ghar ka hisaab',
-        short_name: 'Khaata',
+        name: 'Hamara Hisaab',
+        short_name: 'Hisaab',
         description: 'The household ledger: expenses, budgets, portfolio, zakat',
         theme_color: '#0b5540',
         background_color: '#fafaf7',

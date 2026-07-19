@@ -1,4 +1,4 @@
-# Khaata — ghar ka hisaab, ek jagah
+# Hamara Hisaab — ghar ka sara hisaab, ek jagah
 
 Self-hosted household finance app for Pakistan: shared expense/income ledger, budgets,
 PSX + mutual fund portfolio, loans (qarz), recurring bills and a zakat helper.
@@ -74,18 +74,18 @@ Recurring bills materialize into the ledger on their due day (00:15 PKT, with ca
 To reach the app (and its `/mcp` endpoint) from anywhere — phones, WhatsApp agents — without opening ports:
 
 1. Add your domain to Cloudflare (free plan is fine).
-2. [Zero Trust dashboard](https://one.dash.cloudflare.com) → **Networks → Tunnels → Create a tunnel** → *Cloudflared* connector → name it (e.g. `khaata`).
+2. [Zero Trust dashboard](https://one.dash.cloudflare.com) → **Networks → Tunnels → Create a tunnel** → *Cloudflared* connector → name it (e.g. `hisaab`).
 3. On the connector page pick **Docker**, copy the token from the shown command, and put it in `.env` as `TUNNEL_TOKEN=...`.
-4. Add a **Public hostname**: `khaata.yourdomain.com` → service **HTTP** → `app:3000`.
+4. Add a **Public hostname**: `hisaab.yourdomain.com` → service **HTTP** → `app:3000`.
 5. Update `.env`:
    ```
-   APP_URL=https://khaata.yourdomain.com
+   APP_URL=https://hisaab.yourdomain.com
    TRUSTED_ORIGINS=http://localhost:3000     # keep local login working (match your APP_PORT)
    ```
 6. `docker compose --profile public up -d --build`
 7. Register your household members at the public URL, then set `DISABLE_SIGNUPS=true` in `.env` and restart — no strangers can create accounts on your instance.
 
-Agents then connect to `https://khaata.yourdomain.com/mcp` (header `x-api-key`) from anywhere.
+Agents then connect to `https://hisaab.yourdomain.com/mcp` (header `x-api-key`) from anywhere.
 
 ## Development
 
