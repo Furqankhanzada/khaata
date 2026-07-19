@@ -86,7 +86,7 @@ To reach the app (and its `/mcp` endpoint) from anywhere — phones, WhatsApp ag
 5. Update `.env`:
    ```
    APP_URL=https://hisaab.yourdomain.com
-   TRUSTED_ORIGINS=http://localhost:3000     # keep local login working (match your APP_PORT)
+   TRUSTED_ORIGINS=http://localhost:9700     # keep local login working (match your APP_PORT)
    ```
 6. `docker compose --profile public up -d --build`
 7. Register your household members at the public URL, then set `DISABLE_SIGNUPS=true` in `.env` and restart — no strangers can create accounts on your instance.

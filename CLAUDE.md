@@ -18,7 +18,7 @@
 
 - Dev: `docker compose up -d db` then `PORT=3001 npx tsx src/index.ts` (host port 3000 is usually taken by another project).
 - Checks: `npm run typecheck` · `npm test` · `npm run test:e2e` · `npm run build`
-- Deploy: `docker compose up -d --build app` — then **verify the served bundle hash changed** (`curl -s localhost:3002/ | grep -oE 'assets/index-[^"]+\.js'`); a stale image once passed the health check silently.
+- Deploy: `docker compose up -d --build app` — then **verify the served bundle hash changed** (`curl -s localhost:9700/ | grep -oE 'assets/index-[^"]+\.js'`); a stale image once passed the health check silently.
 
 ## Test infrastructure
 
