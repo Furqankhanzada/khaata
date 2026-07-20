@@ -33,7 +33,7 @@ function buildServer(ctx: Ctx) {
   tool('list_transactions', 'List/search household transactions with optional date, type, category, member and text filters.',
     tx.transactionFilters.shape, (a) => tx.listTransactions(ctx, tx.transactionFilters.parse(a)))
   tool('update_transaction', 'Fix an existing transaction by id (any field).',
-    { id: z.string(), ...tx.transactionUpdate.shape },
+    { ...tx.transactionUpdate.shape, id: z.string() },
     async (a: { id: string }) => (await tx.updateTransaction(ctx, a.id, tx.transactionUpdate.parse(a))) ?? { error: 'not found' })
   tool('delete_transaction', 'Delete a transaction by id.',
     { id: z.string() }, async (a: { id: string }) => ({ deleted: await tx.deleteTransaction(ctx, a.id) }))
@@ -99,7 +99,7 @@ function buildServer(ctx: Ctx) {
     recurring.recurringInput.shape, (a) => recurring.addRecurring(ctx, recurring.recurringInput.parse(a)))
   tool('list_recurring', 'List recurring rules.', {}, () => recurring.listRecurring(ctx))
   tool('update_recurring', 'Update or deactivate (active:false) a recurring rule.',
-    { id: z.string(), ...recurring.recurringUpdate.shape },
+    { ...recurring.recurringUpdate.shape, id: z.string() },
     async (a: { id: string }) => (await recurring.updateRecurring(ctx, a.id, recurring.recurringUpdate.parse(a))) ?? { error: 'not found' })
 
   tool('list_accounts', "List cash/bank accounts visible to you (your own + household-shared). Balances are in each account's own currency; base_balance/rate give the PKR value at the latest exchange rate.", {}, () => accounts.listAccounts(ctx))

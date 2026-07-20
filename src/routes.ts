@@ -16,6 +16,7 @@ import * as zakat from './services/zakat'
 import * as fx from './services/fx'
 import * as brief from './services/brief'
 import { audit, listAudit } from './services/audit'
+import { getSnapshot } from './services/snapshot'
 
 // ponytail: single routes file — every handler is parse → service → json
 export const api = new Hono<AuthEnv>()
@@ -55,6 +56,13 @@ api.post('/household', async (c) => {
 api.use('*', requireHousehold)
 
 api.get('/household', async (c) => c.json(await household.getHousehold(hctx(c))))
+api.get('/snapshot', async (c) => {
+  const snap = await getSnapshot(hctx(c))
+  const etag = `"${snap.hash}"`
+  c.header('ETag', etag)
+  if (c.req.header('If-None-Match') === etag) return c.body(null, 304)
+  return c.json(snap)
+})
 api.get('/audit', async (c) =>
   c.json(await listAudit(hctx(c), z.coerce.number().int().min(1).max(200).default(50).parse(c.req.query('limit')))))
 api.post('/household/rotate-invite', async (c) => c.json(await household.rotateInvite(hctx(c))))

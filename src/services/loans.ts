@@ -9,6 +9,7 @@ import { visibilityInput } from './accounts'
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 export const loanInput = z.object({
+  id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
   counterparty: z.string().min(1).describe('Who the loan is with, e.g. "Ahmed bhai"'),
   direction: z.enum(['lent', 'borrowed']).describe("'lent' = they owe us, 'borrowed' = we owe them"),
   principal: z.coerce.number().positive().describe('Amount in PKR'),
@@ -20,6 +21,7 @@ export const loanInput = z.object({
 const loanVisibleTo = (userId: string) => or(eq(loans.visibility, 'shared'), eq(loans.userId, userId))
 
 export const loanPaymentInput = z.object({
+  id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
   amount: z.coerce.number().positive().describe('Repayment amount in PKR'),
   paid_on: dateStr.optional().describe('Defaults to today'),
   note: z.string().optional(),
@@ -27,6 +29,7 @@ export const loanPaymentInput = z.object({
 
 export async function addLoan(ctx: Ctx, input: z.infer<typeof loanInput>) {
   const [row] = await db.insert(loans).values({
+    id: input.id,
     householdId: ctx.householdId,
     userId: ctx.userId,
     counterparty: input.counterparty,
@@ -35,7 +38,8 @@ export async function addLoan(ctx: Ctx, input: z.infer<typeof loanInput>) {
     startDate: input.start_date ?? todayPk(),
     visibility: input.visibility,
     note: input.note,
-  }).returning()
+  }).onConflictDoNothing().returning()
+  if (!row) return getLoan(ctx, input.id!) // offline replay of an already-applied create
   return { ...row, paid: 0, outstanding: Number(row.principal) }
 }
 
@@ -73,11 +77,12 @@ export async function addLoanPayment(ctx: Ctx, loanId: string, input: z.infer<ty
     .where(and(eq(loans.id, loanId), eq(loans.householdId, ctx.householdId), loanVisibleTo(ctx.userId)))
   if (!loan) return null
   await db.insert(loanPayments).values({
+    id: input.id,
     loanId,
     amount: input.amount.toFixed(2),
     paidOn: input.paid_on ?? todayPk(),
     note: input.note,
-  })
+  }).onConflictDoNothing()
   const updated = await getLoan(ctx, loanId)
   if (updated && Number(updated.outstanding) <= 0 && loan.status === 'open') {
     await db.update(loans).set({ status: 'settled' }).where(eq(loans.id, loanId))
