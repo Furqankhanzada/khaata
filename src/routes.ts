@@ -15,11 +15,22 @@ import * as accounts from './services/accounts'
 import * as zakat from './services/zakat'
 import * as fx from './services/fx'
 import * as brief from './services/brief'
+import { audit, listAudit } from './services/audit'
 
 // ponytail: single routes file — every handler is parse → service → json
 export const api = new Hono<AuthEnv>()
 
 api.use('*', requireAuth)
+
+// audit every successful mutation; clone() so handlers can still read the body themselves
+api.use('*', async (c, next) => {
+  const mutating = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(c.req.method)
+  const body = mutating ? await c.req.raw.clone().json().catch(() => undefined) : undefined
+  await next()
+  if (mutating && c.res.status < 400)
+    await audit({ channel: 'api', action: `${c.req.method} ${c.req.path}`, detail: body,
+      userId: c.get('userId'), householdId: c.get('householdId') })
+})
 
 // --- available before joining a household ---
 api.get('/me', async (c) => {
@@ -44,6 +55,8 @@ api.post('/household', async (c) => {
 api.use('*', requireHousehold)
 
 api.get('/household', async (c) => c.json(await household.getHousehold(hctx(c))))
+api.get('/audit', async (c) =>
+  c.json(await listAudit(hctx(c), z.coerce.number().int().min(1).max(200).default(50).parse(c.req.query('limit')))))
 api.post('/household/rotate-invite', async (c) => c.json(await household.rotateInvite(hctx(c))))
 
 api.post('/transactions', async (c) => c.json(await tx.addTransaction(hctx(c), tx.transactionInput.parse(await c.req.json())), 201))

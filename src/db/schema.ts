@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, date, numeric, timestamp, integer, index, unique, primaryKey } from 'drizzle-orm/pg-core'
+import { pgTable, text, boolean, date, numeric, timestamp, integer, index, unique, primaryKey, jsonb } from 'drizzle-orm/pg-core'
 import { user } from './auth-schema'
 
 export * from './auth-schema'
@@ -134,3 +134,14 @@ export const zakatSettings = pgTable('zakat_settings', {
   nextDueDate: date('next_due_date'),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
+
+// Every successful mutation (REST + MCP), purged after 30 days — no FKs so rows outlive their referents
+export const auditLog = pgTable('audit_log', {
+  id: id(),
+  at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  householdId: text('household_id'),
+  userId: text('user_id'),
+  channel: text('channel', { enum: ['api', 'mcp'] }).notNull(),
+  action: text('action').notNull(), // MCP tool name, or "PATCH /api/v1/transactions/<id>"
+  detail: jsonb('detail'), // request args/body verbatim
+}, (t) => [index('audit_log_at_idx').on(t.at)])

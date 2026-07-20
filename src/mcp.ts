@@ -13,6 +13,7 @@ import * as accounts from './services/accounts'
 import * as zakat from './services/zakat'
 import * as fx from './services/fx'
 import * as brief from './services/brief'
+import { audit, listAudit } from './services/audit'
 
 const json = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 1) }] })
 
@@ -20,7 +21,12 @@ function buildServer(ctx: Ctx) {
   const server = new McpServer({ name: 'hamara-hisaab', version: '1.0.0' })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tool = (name: string, description: string, shape: z.ZodRawShape, handler: (args: any) => Promise<unknown>) =>
-    server.registerTool(name, { description, inputSchema: shape }, async (args) => json(await handler(args)))
+    server.registerTool(name, { description, inputSchema: shape }, async (args) => {
+      console.log(`[mcp] user=${ctx.userId} ${name} ${JSON.stringify(args)}`)
+      const result = json(await handler(args))
+      if (!/^(list_|get_)/.test(name)) await audit({ channel: 'mcp', action: name, detail: args, ...ctx })
+      return result
+    })
 
   tool('add_transaction', "Record an expense or income in the household ledger. Amounts are PKR by default; for foreign spending pass currency (e.g. amount: 20, currency: 'USD' for $20 spent in Dubai) — it's converted to PKR once at the day's rate (or an explicit fx_rate) and the original is preserved. The payer is the owner of the API key.",
     tx.transactionInput.shape, (a) => tx.addTransaction(ctx, a))
@@ -103,6 +109,9 @@ function buildServer(ctx: Ctx) {
   tool('add_account', "Create a cash/bank account. Use currency for foreign-currency balances (e.g. 'USD' for Payoneer/Upwork).", accounts.accountInput.shape, (a) => accounts.addAccount(ctx, accounts.accountInput.parse(a)))
   tool('record_fx_rate', 'Manually record an exchange rate (PKR per 1 unit of the currency) — used when the daily feed is wrong or unavailable.',
     fx.fxRateInput.shape, (a) => fx.recordFxRate(fx.fxRateInput.parse(a)))
+
+  tool('get_audit_log', "Audit trail: who did what and when — every create/update/delete by household members via app or agent. Other members' wealth actions (holdings/loans/accounts) are hidden per visibility rules.",
+    { limit: z.coerce.number().int().min(1).max(200).default(50) }, (a: { limit: number }) => listAudit(ctx, a.limit))
 
   tool('get_zakat_summary', 'Zakatable assets visible to you (your own + household-shared) vs nisab, and the computed 2.5% zakat due.', {}, () => zakat.zakatSummary(ctx))
   tool('set_zakat_settings', 'Set the nisab threshold (PKR) and next zakat due date.',

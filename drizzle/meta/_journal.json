@@ -22,6 +22,20 @@
       "when": 1784460799366,
       "tag": "0002_supreme_tusk",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784575918583,
+      "tag": "0003_jittery_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784577141846,
+      "tag": "0004_premium_invaders",
+      "breakpoints": true
     }
   ]
 }

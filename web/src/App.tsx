@@ -15,6 +15,7 @@ import Transactions from './pages/Transactions'
 import Budgets from './pages/Budgets'
 import Portfolio from './pages/Portfolio'
 import More from './pages/More'
+import Activity from './pages/Activity'
 
 export type Me = {
   user: { id: string; name: string; email: string; householdId: string | null }
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="/loans" element={<Loans />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/more" element={<More me={me.data} />} />
+          <Route path="/activity" element={<Activity />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

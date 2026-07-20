@@ -34,6 +34,15 @@ export default function More({ me }: { me: Me }) {
       <PageHeader title="More" />
       <AppearanceSection />
       <HouseholdSection me={me} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity</CardTitle>
+          <CardDescription>Who added or changed what, last 30 days</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" render={<Link to="/activity">View activity</Link>} />
+        </CardContent>
+      </Card>
       <ApiKeysSection />
       <AccountsSection />
       <LoansSection />
