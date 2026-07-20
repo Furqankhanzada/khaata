@@ -10,6 +10,7 @@ export const visibilityInput = z.enum(['shared', 'private'])
   .describe("'private' = only you see it; 'shared' = visible to the whole household")
 
 export const accountInput = z.object({
+  id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
   name: z.string().min(1).describe("e.g. 'Meezan current account', 'Payoneer', 'Upwork'"),
   balance: z.coerce.number().min(0).default(0).describe("Current balance in the account's own currency"),
   currency: currencyCode.default(BASE).describe("Account currency, e.g. 'USD' for Payoneer/Upwork"),
@@ -53,6 +54,7 @@ export async function addAccount(ctx: Ctx, input: z.infer<typeof accountInput>) 
   // best-effort rate prefetch — saving must not depend on the FX API being up
   if (input.currency !== BASE) await latestRate(input.currency).catch(() => {})
   const [row] = await db.insert(accounts).values({
+    id: input.id,
     householdId: ctx.householdId,
     userId: ctx.userId,
     name: input.name,
@@ -60,7 +62,12 @@ export async function addAccount(ctx: Ctx, input: z.infer<typeof accountInput>) 
     currency: input.currency,
     zakatable: input.zakatable,
     visibility: input.visibility,
-  }).returning()
+  }).onConflictDoNothing().returning()
+  if (!row) { // offline replay of an already-applied create
+    const [existing] = await db.select().from(accounts)
+      .where(and(eq(accounts.id, input.id!), eq(accounts.householdId, ctx.householdId)))
+    return existing
+  }
   return row
 }
 

@@ -17,6 +17,7 @@ export const instrumentInput = z.object({
 })
 
 export const holdingInput = z.object({
+  id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
   instrument_id: z.string().optional(),
   instrument: instrumentInput.optional().describe('Create/find the instrument inline instead of passing instrument_id'),
   units: z.coerce.number().positive().describe('Units/shares held (1 for lump assets like gold or property)'),
@@ -77,12 +78,19 @@ export async function updateInstrument(ctx: Ctx, id: string, input: z.infer<type
 }
 
 export async function addHolding(ctx: Ctx, input: z.infer<typeof holdingInput>) {
+  // check the client id up front so a replay doesn't re-run instrument creation
+  if (input.id) {
+    const [existing] = await db.select().from(holdings)
+      .where(and(eq(holdings.id, input.id), eq(holdings.householdId, ctx.householdId)))
+    if (existing) return existing
+  }
   let instrumentId = input.instrument_id
   if (!instrumentId) {
     if (!input.instrument) throw new Error('pass instrument_id or instrument')
     instrumentId = (await createInstrument(input.instrument)).id
   }
   const [row] = await db.insert(holdings).values({
+    id: input.id,
     householdId: ctx.householdId,
     instrumentId,
     userId: ctx.userId,

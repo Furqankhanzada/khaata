@@ -9,6 +9,7 @@ import { BASE, currencyCode, latestRate } from './fx'
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
 
 export const transactionInput = z.object({
+  id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
   type: z.enum(['expense', 'income']).describe("'expense' or 'income'"),
   amount: z.coerce.number().positive().describe('Amount (PKR unless currency is given)'),
   currency: currencyCode.optional().describe("Currency of amount if not PKR, e.g. 'USD' for $20 spent abroad"),
@@ -85,6 +86,7 @@ export async function addTransaction(ctx: Ctx, input: z.infer<typeof transaction
   const categoryId = await resolveCategoryId(ctx, input.type, input.category_id, input.category)
   const money = await resolveMoney(input)
   const [row] = await db.insert(transactions).values({
+    id: input.id,
     householdId: ctx.householdId,
     userId: ctx.userId,
     type: input.type,
@@ -92,8 +94,9 @@ export async function addTransaction(ctx: Ctx, input: z.infer<typeof transaction
     categoryId,
     note: input.note,
     occurredOn: input.occurred_on ?? todayPk(),
-  }).returning({ id: transactions.id })
-  return getTransaction(ctx, row.id)
+  }).onConflictDoNothing().returning({ id: transactions.id })
+  // no row = the client id already exists (offline replay) — return the existing one
+  return getTransaction(ctx, row?.id ?? input.id!)
 }
 
 export async function listTransactions(ctx: Ctx, f: z.infer<typeof transactionFilters>) {

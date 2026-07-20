@@ -7,6 +7,7 @@ import type { Ctx } from '../middleware'
 import { addCategory } from './transactions'
 
 export const recurringInput = z.object({
+  id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
   type: z.enum(['expense', 'income']),
   amount: z.coerce.number().positive().describe('Amount in PKR'),
   category: z.string().optional().describe('Category name'),
@@ -19,6 +20,7 @@ export const recurringUpdate = recurringInput.partial().extend({ active: z.boole
 export async function addRecurring(ctx: Ctx, input: z.infer<typeof recurringInput>) {
   const categoryId = input.category ? (await addCategory(ctx, { name: input.category, kind: input.type })).id : null
   const [row] = await db.insert(recurringRules).values({
+    id: input.id,
     householdId: ctx.householdId,
     userId: ctx.userId,
     type: input.type,
@@ -26,7 +28,12 @@ export async function addRecurring(ctx: Ctx, input: z.infer<typeof recurringInpu
     categoryId,
     description: input.description,
     dayOfMonth: input.day_of_month,
-  }).returning()
+  }).onConflictDoNothing().returning()
+  if (!row) { // offline replay of an already-applied create
+    const [existing] = await db.select().from(recurringRules)
+      .where(and(eq(recurringRules.id, input.id!), eq(recurringRules.householdId, ctx.householdId)))
+    return existing
+  }
   return row
 }
 
