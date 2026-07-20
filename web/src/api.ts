@@ -2,6 +2,7 @@ import { createAuthClient } from 'better-auth/react'
 import { apiKeyClient } from '@better-auth/api-key/client'
 import { localRead } from './local/selectors'
 import { refresh } from './local/store'
+import { isQueueable, mutate } from './local/outbox'
 
 export const authClient = createAuthClient({ plugins: [apiKeyClient()] })
 
@@ -22,6 +23,9 @@ export async function api<T = unknown>(path: string, opts?: RequestInit & { json
     const local = await localRead(path).catch(() => undefined)
     if (local !== undefined) return local as T
   }
+
+  // local-first writes: commit locally, queue, sync in the background (works offline)
+  if (isQueueable(method, path)) return (await mutate(method, path, json)) as T
 
   const res = await fetch(`/api/v1${path}`, {
     ...rest,

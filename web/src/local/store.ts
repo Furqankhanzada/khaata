@@ -77,12 +77,15 @@ async function ingest(snap: Snapshot) {
   synced = true
 }
 
-let refreshing: Promise<'ok' | 'unchanged' | 'unauthorized' | 'offline'> | null = null
+let refreshing: Promise<'ok' | 'unchanged' | 'unauthorized' | 'offline' | 'pending'> | null = null
 
 /** Pull the latest snapshot if it changed. Coalesces concurrent calls. */
 export function refresh() {
   refreshing ??= (async () => {
     try {
+      // never ingest over unflushed local writes — the outbox must drain first (syncNow orders this)
+      const [{ c }] = await query<{ c: number }>('select count(*) as c from outbox')
+      if (c > 0) return 'pending' as const
       const etag = await getMeta<string>('etag')
       const res = await fetch('/api/v1/snapshot', { headers: etag ? { 'If-None-Match': etag } : {} })
       if (res.status === 304) return 'unchanged' as const

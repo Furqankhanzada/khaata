@@ -16,7 +16,9 @@ import Budgets from './pages/Budgets'
 import Portfolio from './pages/Portfolio'
 import More from './pages/More'
 import Activity from './pages/Activity'
-import { clearLocal, onChange, refresh } from './local/store'
+import { clearLocal, onChange } from './local/store'
+import { pendingCount, syncNow } from './local/outbox'
+import { Badge } from '@/components/ui/badge'
 
 export type Me = {
   user: { id: string; name: string; email: string; householdId: string | null }
@@ -47,14 +49,15 @@ function useSyncEngine() {
   const qc = useQueryClient()
   useEffect(() => {
     const unsubscribe = onChange(() => qc.invalidateQueries())
-    const doRefresh = async () => {
-      if ((await refresh()) === 'unauthorized') {
+    const doSync = async () => {
+      // flush queued writes first, then pull; never wipe local data while writes are still queued
+      if ((await syncNow()) === 'unauthorized' && (await pendingCount()) === 0) {
         await clearLocal() // session gone (or another account) — drop the mirror, Login takes over
         qc.invalidateQueries()
       }
     }
-    void doRefresh()
-    const onWake = () => void doRefresh()
+    void doSync()
+    const onWake = () => void doSync()
     window.addEventListener('focus', onWake)
     window.addEventListener('online', onWake)
     return () => {
@@ -63,6 +66,35 @@ function useSyncEngine() {
       window.removeEventListener('online', onWake)
     }
   }, [qc])
+}
+
+/** Shows only when something needs attention: offline, or writes waiting to sync. */
+function SyncBadge() {
+  const [pending, setPending] = useState(0)
+  const [online, setOnline] = useState(navigator.onLine)
+  useEffect(() => {
+    const update = () => {
+      setOnline(navigator.onLine)
+      void pendingCount().then(setPending)
+    }
+    update()
+    const unsubscribe = onChange(update)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      unsubscribe()
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
+  if (online && pending === 0) return null
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-16 z-20 mb-[env(safe-area-inset-bottom)] flex justify-center">
+      <Badge variant="secondary" className="shadow-sm">
+        {online ? `Syncing ${pending}…` : pending > 0 ? `Offline — ${pending} saved locally` : 'Offline'}
+      </Badge>
+    </div>
+  )
 }
 
 export default function App() {
@@ -96,6 +128,8 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+
+      <SyncBadge />
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t bg-card pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-lg items-stretch">
