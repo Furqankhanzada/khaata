@@ -10,6 +10,7 @@ import { fetchMufapNavs, norm } from './prices/mufap'
 import { refreshFxRates } from './fx'
 
 export const instrumentInput = z.object({
+  id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
   kind: z.enum(['psx_stock', 'mutual_fund', 'other']),
   symbol: z.string().optional().describe("PSX ticker, e.g. 'MEBL' (psx_stock only)"),
   mufap_fund_name: z.string().optional().describe('Exact fund name as it appears on mufap.com.pk (mutual_fund only)'),
@@ -51,6 +52,10 @@ export async function searchInstruments(search?: string) {
 export async function createInstrument(input: z.infer<typeof instrumentInput>) {
   if (input.kind === 'psx_stock' && !input.symbol) throw new Error('psx_stock needs a symbol')
   if (input.kind === 'mutual_fund' && !input.mufap_fund_name) throw new Error('mutual_fund needs mufap_fund_name for auto NAV (see mufap.com.pk daily NAV table)')
+  if (input.id) {
+    const [existing] = await db.select().from(instruments).where(eq(instruments.id, input.id))
+    if (existing) return existing // offline replay of an already-applied create
+  }
   const symbol = input.symbol?.toUpperCase()
   if (symbol) {
     const [existing] = await db.select().from(instruments).where(eq(instruments.symbol, symbol))
@@ -61,7 +66,7 @@ export async function createInstrument(input: z.infer<typeof instrumentInput>) {
     if (existing) return existing
   }
   const [row] = await db.insert(instruments)
-    .values({ kind: input.kind, symbol, mufapFundName: input.mufap_fund_name, name: input.name })
+    .values({ id: input.id, kind: input.kind, symbol, mufapFundName: input.mufap_fund_name, name: input.name })
     .returning()
   return row
 }
