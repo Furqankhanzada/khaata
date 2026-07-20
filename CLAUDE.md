@@ -10,6 +10,7 @@
 ## Architecture rules
 
 - **Services-first**: business logic lives in `src/services/*`; `src/routes.ts` (REST) and `src/mcp.ts` (MCP tools) are thin wrappers over the same services. Every user-facing capability gets an MCP tool — agents are first-class clients.
+- **Local-first web client**: the browser holds a SQLite (WASM/OPFS) mirror in `web/src/local/*`, fed by `GET /snapshot` (per-user filtered, ETag). `api()` serves GETs from local SQL and routes domain mutations through an outbox (optimistic apply → ordered replay with client-uuid idempotency). Server stays the source of truth; MCP/audit are unaffected. When changing a server read shape, update the matching selector in `web/src/local/selectors.ts`; new creatable inputs need the optional client `id` + onConflictDoNothing pattern.
 - **Wealth privacy**: any query touching holdings/accounts/loans must include the visibility rule (`visibility = 'shared' OR user_id = ctx.userId`); invisible rows 404 on writes.
 - **Money**: all aggregation is PKR. Foreign transactions convert once at entry (locked rate, original preserved); accounts/stocks convert at the latest `fx_rates` rate on read.
 - Schema changes: edit `src/db/schema.ts`, then `npm run db:generate`; hand-append backfills to the generated SQL when needed. Migrations run at app boot.
