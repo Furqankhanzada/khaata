@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, NavLink, Route, Routes } from 'react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { House, NotebookText, ChartNoAxesCombined, Ellipsis, Plus, type LucideIcon } from 'lucide-react'
 import { api } from './api'
 import { cn } from '@/lib/utils'
@@ -16,6 +16,7 @@ import Budgets from './pages/Budgets'
 import Portfolio from './pages/Portfolio'
 import More from './pages/More'
 import Activity from './pages/Activity'
+import { clearLocal, onChange, refresh } from './local/store'
 
 export type Me = {
   user: { id: string; name: string; email: string; householdId: string | null }
@@ -41,7 +42,31 @@ function Tab({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: s
   )
 }
 
+/** Local-first sync: pull the snapshot on boot/focus/reconnect; requery pages when local data changes. */
+function useSyncEngine() {
+  const qc = useQueryClient()
+  useEffect(() => {
+    const unsubscribe = onChange(() => qc.invalidateQueries())
+    const doRefresh = async () => {
+      if ((await refresh()) === 'unauthorized') {
+        await clearLocal() // session gone (or another account) — drop the mirror, Login takes over
+        qc.invalidateQueries()
+      }
+    }
+    void doRefresh()
+    const onWake = () => void doRefresh()
+    window.addEventListener('focus', onWake)
+    window.addEventListener('online', onWake)
+    return () => {
+      unsubscribe()
+      window.removeEventListener('focus', onWake)
+      window.removeEventListener('online', onWake)
+    }
+  }, [qc])
+}
+
 export default function App() {
+  useSyncEngine()
   const me = useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me'), retry: false })
   const [addOpen, setAddOpen] = useState(false)
 

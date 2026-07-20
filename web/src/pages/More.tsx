@@ -5,6 +5,7 @@ import { useTheme } from 'next-themes'
 import { Copy, Plus, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, authClient } from '../api'
+import { clearLocal } from '../local/store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -51,7 +52,7 @@ export default function More({ me }: { me: Me }) {
       <Button
         variant="outline"
         className="text-destructive"
-        onClick={async () => { await authClient.signOut(); qc.invalidateQueries({ queryKey: ['me'] }) }}
+        onClick={async () => { await authClient.signOut(); await clearLocal(); qc.invalidateQueries() }}
       >
         Sign out
       </Button>

@@ -6,6 +6,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
+  optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
+  worker: { format: 'es' },
   plugins: [
     react(),
     tailwindcss(),
@@ -26,7 +28,14 @@ export default defineConfig({
           { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
         ],
       },
-      workbox: { navigateFallbackDenylist: [/^\/api/, /^\/mcp/], skipWaiting: true, clientsClaim: true },
+      workbox: {
+        navigateFallbackDenylist: [/^\/api/, /^\/mcp/],
+        skipWaiting: true,
+        clientsClaim: true,
+        // the sqlite wasm binary must be precached or the app can't open its local db offline
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
+        maximumFileSizeToCacheInBytes: 4_000_000,
+      },
     }),
   ],
   build: { outDir: '../dist/public', emptyOutDir: true },
