@@ -17,6 +17,8 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
+import { Switch } from '@/components/ui/switch'
 import { Amount, CURRENCIES, Confirm, PageHeader, ShareSwitch } from '@/components/shared'
 import type { Me } from '../App'
 import type { Loan } from './Loans'
@@ -200,18 +202,25 @@ function AccountsSection() {
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: () => api<Account[]>('/accounts') })
   const [form, setForm] = useState({ name: '', balance: '', currency: 'PKR' })
   const [shared, setShared] = useState(false)
-  const [editing, setEditing] = useState<{ id: string; balance: string } | null>(null)
+  const [managing, setManaging] = useState<Account | null>(null)
   const inval = () => { qc.invalidateQueries({ queryKey: ['accounts'] }); qc.invalidateQueries({ queryKey: ['zakat'] }) }
+  const total = (accounts.data ?? []).reduce((s, a) => s + (a.base_balance ?? 0), 0)
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Cash & bank accounts</CardTitle>
-        <CardDescription>Snapshot balances — tap one to update it. Counted for zakat. Private to you unless shared.</CardDescription>
+        <CardDescription>Snapshot balances — tap one to edit or delete. Counted for zakat. Private to you unless shared.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
+        {(accounts.data?.length ?? 0) > 1 && (
+          <div className="flex items-center justify-between border-b pb-2 text-xs text-muted-foreground">
+            <span>Total</span>
+            <Amount value={total} className="text-xs" />
+          </div>
+        )}
         {(accounts.data ?? []).map((a) => (
-          <div key={a.id} className="flex min-h-9 items-center justify-between gap-2">
+          <button key={a.id} className="flex min-h-9 w-full items-center justify-between gap-2 text-left active:opacity-70" onClick={() => setManaging(a)}>
             <span className="flex flex-col">
               <span className="flex items-center gap-1.5 text-sm">
                 {a.name}
@@ -226,33 +235,8 @@ function AccountsSection() {
                 </span>
               )}
             </span>
-            {editing?.id === a.id ? (
-              <form className="flex items-center gap-1.5" onSubmit={async (e) => {
-                e.preventDefault()
-                await api(`/accounts/${a.id}`, { method: 'PATCH', json: { balance: Number(editing.balance) } })
-                setEditing(null); inval(); toast(`${a.name} updated`)
-              }}>
-                <Button type="button" size="sm" variant="ghost" onClick={async () => {
-                  const next = a.visibility === 'shared' ? 'private' : 'shared'
-                  await api(`/accounts/${a.id}`, { method: 'PATCH', json: { visibility: next } })
-                  setEditing(null); inval()
-                  toast(next === 'shared' ? 'Now visible to the household' : 'Now private to you')
-                }}>
-                  {a.visibility === 'shared' ? 'Make private' : 'Share'}
-                </Button>
-                <InputGroup className="w-32">
-                  <InputGroupAddon>Rs</InputGroupAddon>
-                  <InputGroupInput type="number" autoFocus className="amount text-right" value={editing.balance}
-                    onChange={(e) => setEditing({ ...editing, balance: e.target.value })} />
-                </InputGroup>
-                <Button type="submit" size="sm">Save</Button>
-              </form>
-            ) : (
-              <button className="text-sm" onClick={() => setEditing({ id: a.id, balance: String(Number(a.balance)) })}>
-                <Amount value={a.balance} currency={a.currency} className="text-sm" />
-              </button>
-            )}
-          </div>
+            <Amount value={a.balance} currency={a.currency} className="text-sm" />
+          </button>
         ))}
         <form className="flex flex-col gap-2" onSubmit={async (e) => {
           e.preventDefault()
@@ -278,7 +262,94 @@ function AccountsSection() {
           <ShareSwitch checked={shared} onChange={setShared} />
         </form>
       </CardContent>
+
+      <Drawer open={!!managing} onOpenChange={(open) => !open && setManaging(null)}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>Edit account</DrawerTitle>
+          </DrawerHeader>
+          <div className="mx-auto w-full max-w-lg px-4 pb-6">
+            {managing && <ManageAccount a={managing} onDone={() => { setManaging(null); inval() }} />}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </Card>
+  )
+}
+
+function ManageAccount({ a, onDone }: { a: Account; onDone: () => void }) {
+  const qc = useQueryClient()
+  const [name, setName] = useState(a.name)
+  const [balance, setBalance] = useState(String(a.balance))
+  const [currency, setCurrency] = useState(a.currency)
+  const [zakatable, setZakatable] = useState(a.zakatable)
+  const [sharedV, setSharedV] = useState(a.visibility === 'shared')
+  const inval = () => { qc.invalidateQueries({ queryKey: ['accounts'] }); qc.invalidateQueries({ queryKey: ['zakat'] }) }
+
+  return (
+    <FieldGroup>
+      <form className="flex flex-col gap-4" onSubmit={async (e) => {
+        e.preventDefault()
+        await api(`/accounts/${a.id}`, { method: 'PATCH', json: { name, balance: Number(balance), currency } })
+        toast(`${name} updated`)
+        onDone()
+      }}>
+        <Field>
+          <FieldLabel htmlFor="account-name">Name</FieldLabel>
+          <Input id="account-name" required value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <div className="flex gap-2">
+          <Field className="flex-1">
+            <FieldLabel htmlFor="account-balance">Balance</FieldLabel>
+            <Input id="account-balance" type="number" step="any" min="0" required className="amount"
+              value={balance} onChange={(e) => setBalance(e.target.value)} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="account-currency">Currency</FieldLabel>
+            <select
+              id="account-currency"
+              className="amount h-9 rounded-lg border border-input bg-transparent px-2 text-sm"
+              value={currency} onChange={(e) => setCurrency(e.target.value)}
+            >
+              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </Field>
+        </div>
+        <Button type="submit">Save</Button>
+      </form>
+
+      <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
+        <span className="text-sm">
+          Counted for zakat
+          <span className="block text-xs text-muted-foreground">Include this balance in the zakat calculation</span>
+        </span>
+        <Switch checked={zakatable} onCheckedChange={async (v: boolean) => {
+          setZakatable(v)
+          await api(`/accounts/${a.id}`, { method: 'PATCH', json: { zakatable: v } })
+          inval()
+          toast(v ? 'Counted for zakat' : 'Excluded from zakat')
+        }} />
+      </label>
+
+      <ShareSwitch checked={sharedV} onChange={async (v) => {
+        setSharedV(v)
+        await api(`/accounts/${a.id}`, { method: 'PATCH', json: { visibility: v ? 'shared' : 'private' } })
+        inval()
+        toast(v ? 'Now visible to the household' : 'Now private to you')
+      }} />
+
+      <Confirm
+        title={`Delete ${a.name}?`}
+        description="The account and its balance disappear; it stops counting toward zakat."
+        actionLabel="Delete"
+        onConfirm={async () => {
+          await api(`/accounts/${a.id}`, { method: 'DELETE' })
+          toast('Account deleted')
+          onDone()
+        }}
+        trigger={<Button variant="outline" className="text-destructive">Delete account</Button>}
+      />
+    </FieldGroup>
   )
 }
 

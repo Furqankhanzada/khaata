@@ -107,6 +107,8 @@ function buildServer(ctx: Ctx) {
     { account_id: z.string(), ...accounts.accountUpdate.shape },
     async (a: { account_id: string }) => (await accounts.updateAccount(ctx, a.account_id, accounts.accountUpdate.parse(a))) ?? { error: 'not found' })
   tool('add_account', "Create a cash/bank account. Use currency for foreign-currency balances (e.g. 'USD' for Payoneer/Upwork).", accounts.accountInput.shape, (a) => accounts.addAccount(ctx, accounts.accountInput.parse(a)))
+  tool('delete_account', 'Delete a cash/bank account by id (its balance stops counting toward zakat).',
+    { id: z.string() }, async (a: { id: string }) => ({ deleted: await accounts.deleteAccount(ctx, a.id) }))
   tool('record_fx_rate', 'Manually record an exchange rate (PKR per 1 unit of the currency) — used when the daily feed is wrong or unavailable.',
     fx.fxRateInput.shape, (a) => fx.recordFxRate(fx.fxRateInput.parse(a)))
 

@@ -164,6 +164,8 @@ async function applyLocal(method: string, path: string, b: Row): Promise<Stmt[]>
       })],
     }]
   }
+  if ((m = p.match(/^\/accounts\/([^/]+)$/)) && method === 'DELETE')
+    return [{ sql: `delete from docs where collection = 'accounts' and id = ?`, bind: [m[1]] }]
   if ((m = p.match(/^\/accounts\/([^/]+)$/)) && method === 'PATCH') {
     const [row] = await query<{ data: string }>(`select data from docs where collection = 'accounts' and id = ?`, [m[1]])
     if (!row) return []
