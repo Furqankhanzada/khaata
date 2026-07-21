@@ -42,10 +42,10 @@ async function ingest(snap: Snapshot) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...snap.transactions.map((t: any, i: number): Stmt => ({
       sql: `insert into transactions(id, type, amount, original_amount, original_currency, fx_rate,
-              category_id, category, note, occurred_on, source, user_id, paid_by, ord)
-            values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              category_id, category, tags, note, occurred_on, source, user_id, paid_by, ord)
+            values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       bind: [t.id, t.type, Number(t.amount), t.originalAmount, t.originalCurrency, t.fxRate,
-        t.categoryId, t.category, t.note, t.occurredOn, t.source, t.userId, t.paidBy, i],
+        t.categoryId, t.category, JSON.stringify(t.tags ?? []), t.note, t.occurredOn, t.source, t.userId, t.paidBy, i],
     })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...snap.categories.map((c: any): Stmt => ({
@@ -57,6 +57,9 @@ async function ingest(snap: Snapshot) {
       sql: 'insert into budgets(category_id, monthly_amount) values(?,?)',
       bind: [b.categoryId, Number(b.monthlyAmount)],
     })),
+    // ponytail: the tag vocabulary rides in `docs` — a handful of {id,name} rows never need a table
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...snap.tags.map((t: any) => doc('tags', t.id, t)),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...snap.loans.map((l: any) => doc('loans', l.id, l)),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

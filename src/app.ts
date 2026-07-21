@@ -1,5 +1,6 @@
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { ZodError } from 'zod'
 import { auth } from './auth'
@@ -15,6 +16,8 @@ export function buildApp() {
 
   app.onError((err, c) => {
     if (err instanceof ZodError) return c.json({ error: 'validation', issues: err.issues }, 400)
+    // services signal caller errors (e.g. an unknown tag) this way — the message is the guidance
+    if (err instanceof HTTPException) return c.json({ error: err.message }, err.status)
     console.error(err)
     return c.json({ error: (err as Error).message ?? 'internal error' }, 500)
   })

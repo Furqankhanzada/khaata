@@ -1,7 +1,8 @@
-import { and, desc, eq, gte, ilike, lte } from 'drizzle-orm'
+import { and, arrayContains, desc, eq, gte, ilike, lte } from 'drizzle-orm'
+import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { db } from '../db/client'
-import { categories, transactions, user } from '../db/schema'
+import { categories, tags, transactions, user } from '../db/schema'
 import { todayIn } from '../util'
 import type { Ctx } from '../middleware'
 import { currencyCode, latestRate } from './fx'
@@ -16,6 +17,8 @@ export const transactionInput = z.object({
   fx_rate: z.coerce.number().positive().optional().describe('PKR per 1 unit of currency; defaults to the latest daily rate'),
   category_id: z.string().optional(),
   category: z.string().optional().describe("Category name, e.g. 'Groceries' (created if new)"),
+  tags: z.array(z.string()).optional()
+    .describe("What was bought, from the household's tag vocabulary — broad + specific together, e.g. ['meat','chicken']. Call list_tags first; unknown tags are rejected."),
   note: z.string().optional().describe('Free-text note, e.g. what was bought'),
   occurred_on: dateStr.optional().describe('Date YYYY-MM-DD, defaults to today (Pakistan time)'),
 })
@@ -39,6 +42,8 @@ export const transactionFilters = z.object({
   to: dateStr.optional().describe('End date inclusive'),
   type: z.enum(['expense', 'income']).optional(),
   category_id: z.string().optional(),
+  tags: z.array(z.string()).optional()
+    .describe("Only entries carrying all of these tags, e.g. ['meat'] — exact, unlike a q search"),
   user_id: z.string().optional().describe('Filter by which household member paid'),
   q: z.string().optional().describe('Search in notes'),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -58,6 +63,23 @@ async function resolveCategoryId(ctx: Ctx, kind: 'expense' | 'income', categoryI
   return created.id
 }
 
+/**
+ * Tags are a controlled vocabulary: unknown names are rejected rather than created (categories do
+ * the opposite). That strictness is the feature — it's what stops "meats"/"beef" drifting apart and
+ * keeps "how much on meat" exact. The error lists the valid tags so a caller can correct itself.
+ */
+async function resolveTags(ctx: Ctx, names: string[]) {
+  if (!names.length) return []
+  const known = await db.select({ name: tags.name }).from(tags).where(eq(tags.householdId, ctx.householdId))
+  const canonical = new Map(known.map((t) => [t.name.toLowerCase(), t.name]))
+  const unknown = names.filter((n) => !canonical.has(n.trim().toLowerCase()))
+  if (unknown.length)
+    throw new HTTPException(400, {
+      message: `unknown tag(s): ${unknown.join(', ')} — valid: ${known.map((t) => t.name).sort().join(', ') || '(none yet)'} (add one with add_tag)`,
+    })
+  return [...new Set(names.map((n) => canonical.get(n.trim().toLowerCase())!))]
+}
+
 const selection = {
   id: transactions.id,
   type: transactions.type,
@@ -67,6 +89,7 @@ const selection = {
   fxRate: transactions.fxRate,
   categoryId: transactions.categoryId,
   category: categories.name,
+  tags: transactions.tags,
   note: transactions.note,
   occurredOn: transactions.occurredOn,
   source: transactions.source,
@@ -92,6 +115,7 @@ export async function addTransaction(ctx: Ctx, input: z.infer<typeof transaction
     type: input.type,
     ...money,
     categoryId,
+    tags: await resolveTags(ctx, input.tags ?? []),
     note: input.note,
     occurredOn: input.occurred_on ?? todayIn(ctx.timezone),
   }).onConflictDoNothing().returning({ id: transactions.id })
@@ -105,6 +129,7 @@ export async function listTransactions(ctx: Ctx, f: z.infer<typeof transactionFi
   if (f.to) conds.push(lte(transactions.occurredOn, f.to))
   if (f.type) conds.push(eq(transactions.type, f.type))
   if (f.category_id) conds.push(eq(transactions.categoryId, f.category_id))
+  if (f.tags?.length) conds.push(arrayContains(transactions.tags, f.tags)) // all of them, not any
   if (f.user_id) conds.push(eq(transactions.userId, f.user_id))
   if (f.q) conds.push(ilike(transactions.note, `%${f.q}%`))
   return db.select(selection).from(transactions)
@@ -128,6 +153,8 @@ export async function updateTransaction(ctx: Ctx, id: string, input: z.infer<typ
     type,
     ...money,
     categoryId,
+    // omitted tags are left alone; [] clears them
+    tags: input.tags ? await resolveTags(ctx, input.tags) : undefined,
     note: input.note ?? undefined,
     occurredOn: input.occurred_on ?? undefined,
   }).where(and(eq(transactions.id, id), eq(transactions.householdId, ctx.householdId)))
@@ -159,4 +186,28 @@ export async function addCategory(ctx: Ctx, input: z.infer<typeof categoryInput>
   return row ?? db.select().from(categories)
     .where(and(eq(categories.householdId, ctx.householdId), eq(categories.name, input.name), eq(categories.kind, input.kind)))
     .then(r => r[0])
+}
+
+export async function listTags(ctx: Ctx) {
+  return db.select().from(tags)
+    .where(and(eq(tags.householdId, ctx.householdId), eq(tags.archived, false)))
+    .orderBy(tags.name)
+}
+
+export const tagInput = z.object({
+  id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
+  name: z.string().min(1).describe("What was bought, e.g. 'meat' or 'chicken'"),
+})
+
+export async function addTag(ctx: Ctx, input: z.infer<typeof tagInput>) {
+  const name = input.name.trim()
+  // case-insensitive: 'Meat' must not become a second tag next to 'meat'
+  const [existing] = await db.select().from(tags)
+    .where(and(eq(tags.householdId, ctx.householdId), ilike(tags.name, name)))
+  if (existing) return existing
+  const [row] = await db.insert(tags)
+    .values({ id: input.id, householdId: ctx.householdId, name })
+    .onConflictDoNothing().returning()
+  return row ?? db.select().from(tags)
+    .where(and(eq(tags.householdId, ctx.householdId), eq(tags.name, name))).then((r) => r[0])
 }

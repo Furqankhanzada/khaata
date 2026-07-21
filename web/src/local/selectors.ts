@@ -63,8 +63,12 @@ async function budgetStatus(month?: string) {
 }
 
 const txSelect = `select id, type, amount, original_amount as originalAmount, original_currency as originalCurrency,
-  fx_rate as fxRate, category_id as categoryId, category, note, occurred_on as occurredOn,
+  fx_rate as fxRate, category_id as categoryId, category, tags, note, occurred_on as occurredOn,
   source, user_id as userId, paid_by as paidBy from transactions`
+
+/** tags live as a JSON string locally (SQLite has no arrays) — hand back the server's shape. */
+const txRows = async (sql: string, bind: unknown[]) =>
+  (await query<Row>(sql, bind)).map((r) => ({ ...r, tags: JSON.parse(r.tags ?? '[]') }))
 
 // note: loan rows are snake_case (server raw SQL) but payment rows are camelCase (drizzle select)
 function loanTotals(loan: Row, payments: Row[]): Row {
@@ -122,14 +126,15 @@ export async function localRead(path: string): Promise<unknown> {
   if (p === '/transactions') {
     const q = params.get('q')
     const limit = Number(params.get('limit') ?? 50)
-    return query(
+    return txRows(
       `${txSelect}${q ? ' where note like ?' : ''} order by occurred_on desc, ord asc limit ?`,
       q ? [`%${q}%`, limit] : [limit])
   }
   const txOne = p.match(/^\/transactions\/([^/]+)$/)
-  if (txOne) return (await query(`${txSelect} where id = ?`, [txOne[1]]))[0]
+  if (txOne) return (await txRows(`${txSelect} where id = ?`, [txOne[1]]))[0]
 
   if (p === '/categories') return query(`select id, name, kind from categories where archived = 0 order by kind, name`)
+  if (p === '/tags') return (await docs('tags')).sort((a, b) => String(a.name).localeCompare(String(b.name)))
   if (p === '/budgets/status') return budgetStatus()
   if (p === '/reports/monthly') {
     const { month: m, from, toExclusive } = monthBounds(params.get('month') ?? undefined)

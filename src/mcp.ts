@@ -30,9 +30,9 @@ function buildServer(ctx: Ctx) {
       return result
     })
 
-  tool('add_transaction', "Record an expense or income in the household ledger. Amounts are in the household base currency by default; for foreign spending pass currency (e.g. amount: 20, currency: 'USD') — it's converted to the base once at the day's rate (or an explicit fx_rate) and the original is preserved. The payer is the owner of the API key.",
+  tool('add_transaction', "Record an expense or income in the household ledger. Amounts are in the household base currency by default; for foreign spending pass currency (e.g. amount: 20, currency: 'USD') — it's converted to the base once at the day's rate (or an explicit fx_rate) and the original is preserved. The payer is the owner of the API key. Split an itemised bill into one transaction per item and tag each with what it was — broad and specific together, e.g. chicken breast → tags ['meat','chicken'].",
     tx.transactionInput.shape, (a) => tx.addTransaction(ctx, a))
-  tool('list_transactions', 'List/search household transactions with optional date, type, category, member and text filters.',
+  tool('list_transactions', "List/search household transactions with optional date, type, category, tag, member and text filters. To total what was bought (meat, milk, fruit) use tags — q searches free text and will match unrelated notes, e.g. a 'chicken burger' dining entry is not meat.",
     tx.transactionFilters.shape, (a) => tx.listTransactions(ctx, tx.transactionFilters.parse(a)))
   tool('update_transaction', 'Fix an existing transaction by id (any field).',
     { ...tx.transactionUpdate.shape, id: z.string() },
@@ -43,6 +43,11 @@ function buildServer(ctx: Ctx) {
   tool('list_categories', 'List expense and income categories of the household.', {}, () => tx.listCategories(ctx))
   tool('add_category', 'Add a new category.', tx.categoryInput.shape, (a) => tx.addCategory(ctx, a))
 
+  tool("list_tags", "The household's tag vocabulary — what was bought (milk, meat, chicken, fruit…), a second axis to categories. Call this before tagging or querying by tag; tags outside this list are rejected.",
+    {}, () => tx.listTags(ctx))
+  tool('add_tag', 'Add a tag to the vocabulary. Only when the user names a genuinely new kind of item — prefer an existing tag over a near-duplicate.',
+    tx.tagInput.shape, (a) => tx.addTag(ctx, a))
+
   tool('get_budget_status', 'Budget picture for a month (default current): per-category spent vs cap, overall totals, spending outside any budget (unbudgeted_spent), and month_elapsed_pct for pace judgement.',
     { month: z.string().optional().describe('YYYY-MM') }, (a: { month?: string }) => budgets.budgetStatus(ctx, a.month))
   tool('set_budget', 'Set (or remove with 0) the monthly budget cap for a category.',
@@ -51,9 +56,9 @@ function buildServer(ctx: Ctx) {
 
   tool('get_daily_brief', "Composed morning brief in one call: yesterday's spending, month so far, budget pace warnings, bills due in the next 7 days, open loans, and a zakat-date reminder. The `text` field is ready to post to a family chat as-is.",
     {}, () => brief.dailyBrief(ctx))
-  tool('get_monthly_report', 'Monthly summary: income, expense, net, category breakdown, per-member split, budget compare.',
+  tool('get_monthly_report', 'Monthly summary: income, expense, net, category breakdown, per-tag breakdown (what was bought), per-member split, budget compare. by_tag totals overlap — an entry tagged meat+chicken counts in both — so they do not sum to the month total.',
     { month: z.string().optional().describe('YYYY-MM') }, (a: { month?: string }) => reports.monthlyReport(ctx, a.month))
-  tool('get_report', 'Weekly/monthly/quarterly/yearly or custom-range report: totals, previous-period comparison, income/expense trend buckets, category and member breakdowns.',
+  tool('get_report', 'Weekly/monthly/quarterly/yearly or custom-range report: totals, previous-period comparison, income/expense trend buckets, category, tag and member breakdowns. Best way to answer "how much did I spend on meat last month" — read by_tag (its totals overlap, so they do not sum to the period total).',
     {
       period: z.enum(['week', 'month', 'quarter', 'year']).default('month'),
       offset: z.coerce.number().int().max(0).default(0).describe('0 = current period, -1 = previous, …'),

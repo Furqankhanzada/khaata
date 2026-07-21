@@ -5,7 +5,8 @@ describe('snapshot', () => {
   it('bundles per-user data and hides other members private wealth', async () => {
     const a = await makeUser()
     const b = await makeUser({ inviteCode: await inviteCodeOf(a) })
-    await json('/api/v1/transactions', { key: a.key, json: { type: 'expense', amount: 250, category: 'Groceries', note: 'snap milk' } })
+    await json('/api/v1/tags', { key: a.key, json: { name: 'milk' } })
+    await json('/api/v1/transactions', { key: a.key, json: { type: 'expense', amount: 250, category: 'Groceries', note: 'snap milk', tags: ['milk'] } })
     await mcp(a.key, 'tools/call', {
       name: 'add_holding',
       arguments: { instrument: { kind: 'other', name: 'Private Gold' }, units: 2, visibility: 'private' },
@@ -16,6 +17,9 @@ describe('snapshot', () => {
     expect(snapB.household.members).toHaveLength(2)
     expect(snapB.transactions.map((t: any) => t.note)).toContain('snap milk')
     expect(snapB.categories.length).toBeGreaterThan(0)
+    // the local mirror needs both the vocabulary and the tags on each row
+    expect(snapB.tags.map((t: any) => t.name)).toContain('milk')
+    expect(snapB.transactions.find((t: any) => t.note === 'snap milk').tags).toEqual(['milk'])
     expect(JSON.stringify(snapB.portfolio)).not.toContain('Private Gold')
 
     const snapA = await json<any>('/api/v1/snapshot', { key: a.key })

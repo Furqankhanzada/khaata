@@ -25,7 +25,13 @@ async function breakdownFor(householdId: string, from: string, toExclusive: stri
     from transactions t join "user" u on u.id = t.user_id
     where t.household_id = ${householdId} and t.occurred_on >= ${from} and t.occurred_on < ${toExclusive}
     group by u.name, t.type order by u.name`)
-  return { by_category: byCategory.rows, by_member: byMember.rows }
+  // an entry counts under each of its tags, so these totals overlap and won't sum to the period total
+  const byTag = await db.execute(sql`
+    select tag, t.type, sum(t.amount)::float8 as total
+    from transactions t, unnest(t.tags) as tag
+    where t.household_id = ${householdId} and t.occurred_on >= ${from} and t.occurred_on < ${toExclusive}
+    group by tag, t.type order by total desc`)
+  return { by_category: byCategory.rows, by_member: byMember.rows, by_tag: byTag.rows }
 }
 
 export async function monthlyReport(ctx: Ctx, month?: string) {

@@ -28,6 +28,43 @@ test('expense/income toggle switches type and category list', async ({ page }) =
   await expect(page.getByText('+Rs 75,000').first()).toBeVisible()
 })
 
+test('create tags, toggle them on an expense, and see them survive a reload', async ({ page }) => {
+  await onboard(page)
+  await page.getByRole('button', { name: 'Add entry' }).click()
+
+  // a new tag comes back selected, so it applies to the entry being written
+  const newTag = page.getByLabel('New tag')
+  const chips = page.getByRole('combobox', { name: 'Tags' }).locator('..')
+  for (const name of ['meat', 'chicken', 'fruit']) {
+    await type(newTag, name)
+    await newTag.press('Enter')
+    await expect(chips.getByText(name, { exact: true })).toBeVisible()
+  }
+
+  // picking from the dropdown must ADD, never replace — the bug a single-select would hide
+  await chips.getByText('fruit', { exact: true }).locator('button').click() // remove its chip
+  await expect(chips.getByText('fruit', { exact: true })).toHaveCount(0)
+  await page.getByRole('combobox', { name: 'Tags' }).click()
+  await page.getByRole('option', { name: 'fruit' }).click()
+  for (const name of ['meat', 'chicken', 'fruit'])
+    await expect(chips.getByText(name, { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Amount')).toBeVisible() // form still open
+
+  await type(page.getByLabel('Amount'), '1800')
+  await type(page.getByLabel('Note'), 'chicken breast')
+  await page.getByRole('button', { name: 'Add expense' }).click()
+  await expect(page.getByText('Expense added')).toBeVisible()
+
+  await page.getByRole('link', { name: 'Ledger' }).click()
+  const row = page.getByRole('button').filter({ hasText: 'chicken breast' })
+  await expect(row.getByText('meat', { exact: true })).toBeVisible()
+
+  // the reload round-trips through /snapshot and the local SQLite mirror
+  await page.reload()
+  await expect(row.getByText('meat', { exact: true })).toBeVisible()
+  await expect(row.getByText('chicken', { exact: true })).toBeVisible()
+})
+
 test('delete an entry via the confirm dialog (cancel first)', async ({ page }) => {
   await onboard(page)
   await page.getByRole('button', { name: 'Add entry' }).click()

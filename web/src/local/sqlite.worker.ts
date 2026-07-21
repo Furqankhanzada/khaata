@@ -6,7 +6,7 @@ const SCHEMA = `
 create table if not exists transactions(
   id text primary key, type text not null, amount real not null,
   original_amount real, original_currency text, fx_rate real,
-  category_id text, category text, note text, occurred_on text not null,
+  category_id text, category text, tags text, note text, occurred_on text not null,
   source text, user_id text, paid_by text, ord integer
 );
 create index if not exists tx_date_idx on transactions(occurred_on desc, ord);
@@ -33,6 +33,8 @@ const ready = (async () => {
     persistent = false
   }
   db.exec(SCHEMA)
+  // SCHEMA is create-if-not-exists, so already-provisioned OPFS databases miss new columns
+  try { db.exec('alter table transactions add column tags text') } catch { /* already there */ }
 })()
 
 type Req =

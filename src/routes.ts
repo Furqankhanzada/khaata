@@ -99,7 +99,11 @@ api.get('/audit', async (c) =>
 api.post('/household/rotate-invite', async (c) => c.json(await household.rotateInvite(hctx(c))))
 
 api.post('/transactions', async (c) => c.json(await tx.addTransaction(hctx(c), tx.transactionInput.parse(await c.req.json())), 201))
-api.get('/transactions', async (c) => c.json(await tx.listTransactions(hctx(c), tx.transactionFilters.parse(c.req.query()))))
+api.get('/transactions', async (c) => {
+  const q = c.req.query() // ?tags=meat,chicken — arrays don't survive a query string
+  const filters = tx.transactionFilters.parse({ ...q, tags: q.tags ? q.tags.split(',').filter(Boolean) : undefined })
+  return c.json(await tx.listTransactions(hctx(c), filters))
+})
 api.get('/transactions/:id', async (c) => {
   const row = await tx.getTransaction(hctx(c), c.req.param('id'))
   return row ? c.json(row) : c.json({ error: 'not found' }, 404)
@@ -113,6 +117,9 @@ api.delete('/transactions/:id', async (c) =>
 
 api.get('/categories', async (c) => c.json(await tx.listCategories(hctx(c))))
 api.post('/categories', async (c) => c.json(await tx.addCategory(hctx(c), tx.categoryInput.parse(await c.req.json())), 201))
+
+api.get('/tags', async (c) => c.json(await tx.listTags(hctx(c))))
+api.post('/tags', async (c) => c.json(await tx.addTag(hctx(c), tx.tagInput.parse(await c.req.json())), 201))
 
 api.get('/budgets', async (c) => c.json(await budgets.listBudgets(hctx(c))))
 api.get('/budgets/status', async (c) => c.json(await budgets.budgetStatus(hctx(c), c.req.query('month'))))

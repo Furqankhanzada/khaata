@@ -10,11 +10,12 @@ type Row = Record<string, any>
 const QUEUEABLE = [
   /^\/transactions(\/|$)/, /^\/budgets\/[^/]+$/, /^\/loans(\/|$)/, /^\/holdings(\/|$)/,
   /^\/instruments\/[^/]+$/, /^\/accounts(\/|$)/, /^\/recurring(\/|$)/, /^\/zakat\/settings$/, /^\/prices$/,
+  /^\/tags$/,
 ]
 export const isQueueable = (method: string, path: string) =>
   method !== 'GET' && QUEUEABLE.some((re) => re.test(path.split('?')[0]))
 
-const CREATES_WITH_ID = /^\/(transactions|loans|holdings|accounts|recurring)$|^\/loans\/[^/]+\/payments$/
+const CREATES_WITH_ID = /^\/(transactions|loans|holdings|accounts|recurring|tags)$|^\/loans\/[^/]+\/payments$/
 
 export async function pendingCount() {
   const [{ c }] = await query<{ c: number }>('select count(*) as c from outbox')
@@ -49,14 +50,20 @@ async function applyLocal(method: string, path: string, b: Row): Promise<Stmt[]>
   const p = path.split('?')[0]
   let m: RegExpMatchArray | null
 
+  if (p === '/tags' && method === 'POST')
+    return [{
+      sql: 'insert or replace into docs(collection, id, data) values(?,?,?)',
+      bind: ['tags', b.id, JSON.stringify({ id: b.id, name: b.name, archived: false })],
+    }]
+
   if (p === '/transactions' && method === 'POST') {
     const mo = await money(b)
     return [{
       sql: `insert or replace into transactions(id, type, amount, original_amount, original_currency, fx_rate,
-              category_id, category, note, occurred_on, source, user_id, paid_by, ord)
-            values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              category_id, category, tags, note, occurred_on, source, user_id, paid_by, ord)
+            values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       bind: [b.id, b.type, mo.amount, mo.originalAmount, mo.originalCurrency, mo.fxRate,
-        b.category_id ?? null, b.category ?? null, b.note ?? null, b.occurred_on ?? todayApp(),
+        b.category_id ?? null, b.category ?? null, JSON.stringify(b.tags ?? []), b.note ?? null, b.occurred_on ?? todayApp(),
         'api', me?.id ?? null, me?.name ?? null, -Date.now()],
     }]
   }
@@ -71,6 +78,7 @@ async function applyLocal(method: string, path: string, b: Row): Promise<Stmt[]>
     }
     for (const [key, col] of [['type', 'type'], ['category_id', 'category_id'], ['category', 'category'], ['note', 'note'], ['occurred_on', 'occurred_on']] as const)
       if (b[key] !== undefined) { sets.push(`${col} = ?`); binds.push(b[key]) }
+    if (b.tags !== undefined) { sets.push('tags = ?'); binds.push(JSON.stringify(b.tags)) }
     return sets.length ? [{ sql: `update transactions set ${sets.join(', ')} where id = ?`, bind: [...binds, m[1]] }] : []
   }
 

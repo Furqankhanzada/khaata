@@ -74,6 +74,11 @@ export default function Transactions() {
                         <span className="truncate">{t.category ?? 'Uncategorized'}</span>
                         {t.source === 'recurring' && <Badge variant="secondary">auto</Badge>}
                       </div>
+                      {t.tags?.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {t.tags.map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+                        </div>
+                      )}
                       <div className="text-xs break-words text-muted-foreground">
                         {t.originalCurrency && (
                           <>

@@ -25,12 +25,13 @@ function hashOf(s: string) {
  * Composes the existing service reads so wealth visibility rules apply unchanged.
  */
 export async function getSnapshot(ctx: Ctx) {
-  const [me, hh, categories, transactions, budgetRows, loanList, accountList, recurringList, portfolioData, zakat, fx] =
+  const [me, hh, categories, tagList, transactions, budgetRows, loanList, accountList, recurringList, portfolioData, zakat, fx] =
     await Promise.all([
       db.select({ id: user.id, name: user.name, email: user.email, householdId: user.householdId })
         .from(user).where(eq(user.id, ctx.userId)).then((r) => r[0]),
       household.getHousehold(ctx),
       tx.listCategories(ctx),
+      tx.listTags(ctx),
       tx.listTransactions(ctx, { limit: 10000, offset: 0 }),
       db.select().from(budgets).where(eq(budgets.householdId, ctx.householdId)),
       loans.listLoans(ctx),
@@ -46,7 +47,7 @@ export async function getSnapshot(ctx: Ctx) {
     ? await db.select().from(loanPayments).where(inArray(loanPayments.loanId, loanList.map((l) => l.id)))
     : []
   const data = {
-    me, household: hh, categories, transactions,
+    me, household: hh, categories, tags: tagList, transactions,
     budgets: budgetRows, loans: loanList, loan_payments: payments,
     accounts: accountList, recurring: recurringList, portfolio: portfolioData,
     zakat_settings: zakat, fx_rates: fx,

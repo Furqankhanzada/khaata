@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { pgTable, text, boolean, date, numeric, timestamp, integer, index, unique, primaryKey, jsonb } from 'drizzle-orm/pg-core'
 import { user } from './auth-schema'
 
@@ -26,6 +27,15 @@ export const categories = pgTable('categories', {
   archived: boolean('archived').notNull().default(false),
 }, (t) => [unique().on(t.householdId, t.name, t.kind)])
 
+// What was bought, as a predefined household vocabulary (milk, meat, chicken, …). A second axis to
+// categories: unlike a category name, a tag never matches by accident, so "spend on meat" is exact.
+export const tags = pgTable('tags', {
+  id: id(),
+  householdId: text('household_id').notNull().references(() => households.id),
+  name: text('name').notNull(),
+  archived: boolean('archived').notNull().default(false),
+}, (t) => [unique().on(t.householdId, t.name)])
+
 export const recurringRules = pgTable('recurring_rules', {
   id: id(),
   householdId: text('household_id').notNull().references(() => households.id),
@@ -50,12 +60,17 @@ export const transactions = pgTable('transactions', {
   originalCurrency: text('original_currency'),
   fxRate: numeric('fx_rate', { precision: 18, scale: 8 }),
   categoryId: text('category_id').references(() => categories.id),
+  // names from the household's `tags` vocabulary; an entry counts under each of its tags
+  tags: text('tags').array().notNull().default(sql`'{}'`),
   note: text('note'),
   occurredOn: date('occurred_on').notNull(),
   source: text('source').notNull().default('api'),
   recurringRuleId: text('recurring_rule_id').references(() => recurringRules.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index('transactions_household_date_idx').on(t.householdId, t.occurredOn.desc())])
+}, (t) => [
+  index('transactions_household_date_idx').on(t.householdId, t.occurredOn.desc()),
+  index('transactions_tags_idx').using('gin', t.tags),
+])
 
 export const budgets = pgTable('budgets', {
   householdId: text('household_id').notNull().references(() => households.id),
