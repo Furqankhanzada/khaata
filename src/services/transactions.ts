@@ -2,7 +2,7 @@ import { and, desc, eq, gte, ilike, lte } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db/client'
 import { categories, transactions, user } from '../db/schema'
-import { todayPk } from '../util'
+import { todayIn } from '../util'
 import type { Ctx } from '../middleware'
 import { BASE, currencyCode, latestRate } from './fx'
 
@@ -93,7 +93,7 @@ export async function addTransaction(ctx: Ctx, input: z.infer<typeof transaction
     ...money,
     categoryId,
     note: input.note,
-    occurredOn: input.occurred_on ?? todayPk(),
+    occurredOn: input.occurred_on ?? todayIn(ctx.timezone),
   }).onConflictDoNothing().returning({ id: transactions.id })
   // no row = the client id already exists (offline replay) — return the existing one
   return getTransaction(ctx, row?.id ?? input.id!)

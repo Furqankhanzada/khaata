@@ -41,9 +41,8 @@ export async function api<T = unknown>(path: string, opts?: RequestInit & { json
   return data
 }
 
-/** Today in Pakistan time as YYYY-MM-DD — the whole app (server, mirror, reports) runs on PKT dates,
- *  so entry defaults must too, regardless of the device's timezone. */
-export const todayLocal = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
+/** Today on the household's calendar as YYYY-MM-DD — entry defaults follow the household clock. */
+export { todayApp as todayLocal } from './local/dates'
 
 export const rupees = new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 })
 export const fmt = (n: number | string | null | undefined) =>

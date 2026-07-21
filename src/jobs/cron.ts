@@ -6,7 +6,8 @@ import { purgeAuditLog } from '../services/audit'
 
 export function startJobs() {
   const tz = { timezone: 'Asia/Karachi' }
-  cron.schedule('15 0 * * *', () => void materializeDueRules().catch(logErr('recurring')), tz)
+  // hourly: each household's bills materialize when the due day arrives on ITS calendar
+  cron.schedule('15 * * * *', () => void materializeDueRules().catch(logErr('recurring')), tz)
   cron.schedule('30 0 * * *', () => void refreshFxRates().catch(logErr('fx')), tz)
   cron.schedule('45 0 * * *', () => void purgeAuditLog().catch(logErr('audit-purge')), tz)
   // two attempts: PSX closes mid-afternoon, MUFAP NAV validity dates trickle in through the evening

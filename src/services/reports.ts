@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { db } from '../db/client'
-import { monthBounds, todayPk } from '../util'
+import { monthBounds, todayIn } from '../util'
 import { budgetStatus } from './budgets'
 import type { Ctx } from '../middleware'
 
@@ -29,7 +29,7 @@ async function breakdownFor(householdId: string, from: string, toExclusive: stri
 }
 
 export async function monthlyReport(ctx: Ctx, month?: string) {
-  const { month: m, from, toExclusive } = monthBounds(month)
+  const { month: m, from, toExclusive } = monthBounds(ctx.timezone, month)
   const status = await budgetStatus(ctx, m)
   return {
     month: m,
@@ -51,8 +51,8 @@ const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth()
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** Date range + trend bucket step for a period, `offset` periods back from the current one. */
-export function periodRange(period: Period, offset: number) {
-  const [y, m, d] = todayPk().split('-').map(Number)
+export function periodRange(tz: string, period: Period, offset: number) {
+  const [y, m, d] = todayIn(tz).split('-').map(Number)
   const today = new Date(y, m - 1, d)
   let start: Date, end: Date, label: string, step: string
 
@@ -104,8 +104,8 @@ export type OverviewOpts = { period?: Period; offset?: number; from?: string; to
 export async function overviewReport(ctx: Ctx, opts: OverviewOpts = {}) {
   const { period = 'month', offset = 0 } = opts
   const custom = opts.from && opts.to ? customRange(opts.from, opts.to) : null
-  const cur = custom ? custom.cur : periodRange(period, offset)
-  const prev = custom ? custom.prev : periodRange(period, offset - 1)
+  const cur = custom ? custom.cur : periodRange(ctx.timezone, period, offset)
+  const prev = custom ? custom.prev : periodRange(ctx.timezone, period, offset - 1)
 
   const trend = await db.execute(sql`
     select to_char(gs.bucket, 'YYYY-MM-DD') as bucket,

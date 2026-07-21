@@ -2,7 +2,7 @@
 // Returns undefined for paths it doesn't own (or before first sync) — api() then hits the network.
 import { query } from './db'
 import { getMeta, isSynced } from './store'
-import { buckets, customRange, monthBounds, periodRange, todayPk, type Period } from './dates'
+import { buckets, customRange, monthBounds, periodRange, todayApp, type Period } from './dates'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>
@@ -47,7 +47,7 @@ async function budgetStatus(month?: string) {
      where type = 'expense' and occurred_on >= ? and occurred_on < ?`, [from, toExclusive])
   const budget = rows.reduce((s, r) => s + r.budget, 0)
   const spent = rows.reduce((s, r) => s + r.spent, 0)
-  const today = todayPk()
+  const today = todayApp()
   let month_elapsed_pct: number | null = null
   if (today.slice(0, 7) === m) {
     const [y, mo, d] = today.split('-').map(Number)

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { onboard, pkToday, type } from './util'
+import { onboard, hhToday, type } from './util'
 
 test('period toggles, stepper and custom range', async ({ page }) => {
   await onboard(page)
@@ -25,11 +25,10 @@ test('period toggles, stepper and custom range', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Next period' })).toBeEnabled()
 
   // custom range — fill() with ISO values: typed digit-segments in native date inputs are
-  // platform-dependent (Linux Chromium orders them differently than macOS), and dates must be
-  // Karachi to match the app's PKT day
+  // platform-dependent (Linux Chromium orders them differently than macOS)
   await page.getByRole('button', { name: 'Custom' }).click()
   const [from, to] = [page.locator('input[name="from"]'), page.locator('input[name="to"]')]
-  const todayIso = pkToday()
+  const todayIso = hhToday()
   await from.fill(`${todayIso.slice(0, 7)}-01`)
   await to.fill(todayIso)
   await page.getByRole('button', { name: 'Show' }).click()

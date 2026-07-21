@@ -2,7 +2,12 @@ import { and, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db/client'
 import { accounts, fxRates } from '../db/schema'
-import { todayPk } from '../util'
+import { todayIn } from '../util'
+
+// PSX/MUFAP/fx feeds are Pakistan-market data; their "today" is the market's, not any household's
+// (price-source seam for other markets: issue #4)
+export const MARKET_TZ = 'Asia/Karachi'
+export const marketToday = () => todayIn(MARKET_TZ)
 
 export const BASE = 'PKR'
 export const COMMON_CURRENCIES = ['PKR', 'USD', 'AED', 'MYR', 'TRY', 'SAR', 'EUR', 'GBP']
@@ -34,7 +39,7 @@ async function fetchAndStore(wanted: string[]): Promise<void> {
   if (!res.ok) throw new Error(`fx API ${res.status}`)
   const body = (await res.json()) as { result?: string; rates?: Record<string, number> }
   if (body.result !== 'success' || !body.rates) throw new Error('fx API returned no rates')
-  const asOf = todayPk()
+  const asOf = marketToday()
   for (const q of wanted) {
     const pkrToQuote = body.rates[q]
     if (pkrToQuote && pkrToQuote > 0) await upsertRate(q, asOf, 1 / pkrToQuote)
@@ -57,7 +62,7 @@ export async function latestRate(quote: string): Promise<number> {
 }
 
 export async function recordFxRate(input: z.infer<typeof fxRateInput>) {
-  const asOf = input.as_of ?? todayPk()
+  const asOf = input.as_of ?? marketToday()
   await upsertRate(input.currency, asOf, input.rate)
   return { base: BASE, currency: input.currency, as_of: asOf, rate: input.rate }
 }

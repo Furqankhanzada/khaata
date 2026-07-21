@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { db } from './db/client'
 import { user } from './db/schema'
 import { requireAuth, requireHousehold, hctx, type AuthEnv } from './middleware'
+import { isValidTimezone } from './util'
 import * as tx from './services/transactions'
 import * as budgets from './services/budgets'
 import * as reports from './services/reports'
@@ -39,25 +40,38 @@ api.use('*', async (c, next) => {
 api.get('/me', async (c) => {
   const [u] = await db.select({ id: user.id, name: user.name, email: user.email, householdId: user.householdId })
     .from(user).where(eq(user.id, c.get('userId')))
-  const h = u?.householdId ? await household.getHousehold({ userId: u.id, householdId: u.householdId }) : null
+  const h = u?.householdId
+    ? await household.getHousehold({ userId: u.id, householdId: u.householdId, timezone: c.get('timezone') ?? 'UTC' })
+    : null
   return c.json({ user: u, household: h })
 })
 
 api.post('/household', async (c) => {
-  const body = z.object({ name: z.string().optional(), invite_code: z.string().optional() }).parse(await c.req.json())
+  const body = z.object({ name: z.string().optional(), invite_code: z.string().optional(), timezone: z.string().optional() })
+    .parse(await c.req.json())
   if (c.get('householdId')) return c.json({ error: 'already in a household' }, 409)
   if (body.invite_code) {
     const h = await household.joinHousehold(c.get('userId'), body.invite_code)
     return h ? c.json(h) : c.json({ error: 'invalid invite code' }, 404)
   }
   if (!body.name) return c.json({ error: 'pass name (create) or invite_code (join)' }, 400)
-  return c.json(await household.createHousehold(c.get('userId'), body.name))
+  // required, no product default — the web client sends the device timezone
+  if (!body.timezone || !isValidTimezone(body.timezone))
+    return c.json({ error: "timezone required — an IANA name like 'Asia/Karachi' or 'America/Chicago'" }, 400)
+  return c.json(await household.createHousehold(c.get('userId'), body.name, body.timezone))
 })
 
 // --- everything below needs a household ---
 api.use('*', requireHousehold)
 
 api.get('/household', async (c) => c.json(await household.getHousehold(hctx(c))))
+api.patch('/household', async (c) => {
+  const body = z.object({
+    name: z.string().min(1).optional(),
+    timezone: z.string().refine(isValidTimezone, 'invalid IANA timezone').optional(),
+  }).parse(await c.req.json())
+  return c.json(await household.updateHousehold(hctx(c), body))
+})
 // live sync: one SSE event per household mutation; clients react by pulling the snapshot
 api.get('/events', (c) =>
   streamSSE(c, async (stream) => {

@@ -2,12 +2,12 @@ import { and, eq, ilike, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db/client'
 import { holdings, instruments, prices } from '../db/schema'
-import { todayPk } from '../util'
+
 import type { Ctx } from '../middleware'
 import { visibilityInput } from './accounts'
 import { fetchPsxClose } from './prices/psx'
 import { fetchMufapNavs, norm } from './prices/mufap'
-import { refreshFxRates } from './fx'
+import { marketToday, refreshFxRates } from './fx'
 
 export const instrumentInput = z.object({
   id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
@@ -160,7 +160,7 @@ export async function getPortfolio(ctx: Ctx) {
 }
 
 export async function recordPrice(input: z.infer<typeof priceInput>) {
-  const asOf = input.as_of ?? todayPk()
+  const asOf = input.as_of ?? marketToday()
   const [row] = await db.insert(prices)
     .values({ instrumentId: input.instrument_id, asOf, price: input.price.toFixed(4), source: 'manual' })
     .onConflictDoUpdate({

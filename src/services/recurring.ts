@@ -1,8 +1,8 @@
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db/client'
-import { recurringRules, transactions } from '../db/schema'
-import { todayPk } from '../util'
+import { households, recurringRules, transactions } from '../db/schema'
+import { todayIn } from '../util'
 import type { Ctx } from '../middleware'
 import { addCategory } from './transactions'
 import { notify } from './events'
@@ -70,15 +70,19 @@ export async function deleteRecurring(ctx: Ctx, id: string) {
 
 /** Insert due transactions for all active rules. Idempotent; catches up after downtime. */
 export async function materializeDueRules() {
-  const today = todayPk()
-  const [y, m, d] = today.split('-').map(Number)
-  const daysInMonth = new Date(y, m, 0).getDate()
-  const monthStart = today.slice(0, 7) + '-01'
-
-  const rules = await db.select().from(recurringRules).where(eq(recurringRules.active, true))
+  // runs hourly; each rule is due on its household's calendar, not any global one
+  const rules = await db
+    .select({ rule: recurringRules, timezone: households.timezone })
+    .from(recurringRules)
+    .innerJoin(households, eq(recurringRules.householdId, households.id))
+    .where(eq(recurringRules.active, true))
   let created = 0
   const touched = new Set<string>()
-  for (const rule of rules) {
+  for (const { rule, timezone } of rules) {
+    const today = todayIn(timezone)
+    const [y, m, d] = today.split('-').map(Number)
+    const daysInMonth = new Date(y, m, 0).getDate()
+    const monthStart = today.slice(0, 7) + '-01'
     const dueDay = Math.min(rule.dayOfMonth, daysInMonth)
     const dueDate = `${today.slice(0, 7)}-${String(dueDay).padStart(2, '0')}`
     const alreadyDone = rule.lastMaterialized && rule.lastMaterialized >= monthStart

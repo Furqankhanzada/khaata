@@ -2,7 +2,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db/client'
 import { budgets, categories } from '../db/schema'
-import { monthBounds, todayPk } from '../util'
+import { monthBounds, todayIn } from '../util'
 import type { Ctx } from '../middleware'
 
 export const budgetInput = z.object({
@@ -31,7 +31,7 @@ export async function listBudgets(ctx: Ctx) {
 }
 
 export async function budgetStatus(ctx: Ctx, month?: string) {
-  const { month: m, from, toExclusive } = monthBounds(month)
+  const { month: m, from, toExclusive } = monthBounds(ctx.timezone, month)
   const { rows } = await db.execute<{ budget: number; spent: number }>(sql`
     select c.id as category_id, c.name as category,
            b.monthly_amount::float8 as budget,
@@ -58,7 +58,7 @@ export async function budgetStatus(ctx: Ctx, month?: string) {
   const spent = rows.reduce((s, r) => s + r.spent, 0)
 
   // pace: how far through this month are we (only meaningful for the current month)
-  const today = todayPk()
+  const today = todayIn(ctx.timezone)
   let monthElapsedPct: number | null = null
   if (today.slice(0, 7) === m) {
     const [y, mo, d] = today.split('-').map(Number)

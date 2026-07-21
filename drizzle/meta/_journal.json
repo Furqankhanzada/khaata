@@ -36,6 +36,13 @@
       "when": 1784577141846,
       "tag": "0004_premium_invaders",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784621909316,
+      "tag": "0005_abandoned_bruce_banner",
+      "breakpoints": true
     }
   ]
 }
