@@ -34,20 +34,21 @@ test('create tags, toggle them on an expense, and see them survive a reload', as
 
   // a new tag comes back selected, so it applies to the entry being written
   const newTag = page.getByLabel('New tag')
-  await type(newTag, 'meat')
-  await newTag.press('Enter')
-  await expect(page.getByRole('button', { name: 'meat', pressed: true })).toBeVisible()
-  await type(newTag, 'chicken')
-  await newTag.press('Enter')
-  const chicken = page.getByRole('button', { name: 'chicken', pressed: true })
-  await expect(chicken).toBeVisible()
+  const chips = page.getByRole('combobox', { name: 'Tags' }).locator('..')
+  for (const name of ['meat', 'chicken', 'fruit']) {
+    await type(newTag, name)
+    await newTag.press('Enter')
+    await expect(chips.getByText(name, { exact: true })).toBeVisible()
+  }
 
-  // real clicks, not a synthetic value set: pressed must flip both ways and the form stay open
-  await chicken.click()
-  await expect(page.getByRole('button', { name: 'chicken', pressed: false })).toBeVisible()
-  await page.getByRole('button', { name: 'chicken' }).click()
-  await expect(page.getByRole('button', { name: 'chicken', pressed: true })).toBeVisible()
-  await expect(page.getByLabel('Amount')).toBeVisible()
+  // picking from the dropdown must ADD, never replace — the bug a single-select would hide
+  await chips.getByText('fruit', { exact: true }).locator('button').click() // remove its chip
+  await expect(chips.getByText('fruit', { exact: true })).toHaveCount(0)
+  await page.getByRole('combobox', { name: 'Tags' }).click()
+  await page.getByRole('option', { name: 'fruit' }).click()
+  for (const name of ['meat', 'chicken', 'fruit'])
+    await expect(chips.getByText(name, { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Amount')).toBeVisible() // form still open
 
   await type(page.getByLabel('Amount'), '1800')
   await type(page.getByLabel('Note'), 'chicken breast')

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api, baseSymbol, symbolFor, todayLocal } from './api'
@@ -9,6 +9,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent,
+  ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor,
+} from '@/components/ui/combobox'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Spinner } from '@/components/ui/spinner'
 import { CURRENCIES, Confirm } from '@/components/shared'
@@ -52,6 +56,8 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
   const [busy, setBusy] = useState(false)
 
   const cats = (categories.data ?? []).filter((c) => c.kind === type)
+  const tagNames = (tags.data ?? []).map((t) => t.name)
+  const tagAnchor = useComboboxAnchor()
 
   /** Adding to the vocabulary stays a deliberate act — that's what keeps tags exact. */
   async function addTag() {
@@ -166,23 +172,28 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
           </Field>
         </div>
 
-        {/* ponytail: a flat chip row — swap in a searchable combobox past ~25 tags */}
+        {/* Selection and vocabulary-creation stay separate controls: the server only accepts known
+            tags, and Base UI's Combobox is likewise restricted to its items. */}
         <Field>
           <FieldLabel>Tags</FieldLabel>
-          {(tags.data ?? []).length > 0 && (
-            <ToggleGroup
-              multiple
-              className="w-full flex-wrap"
-              variant="outline"
-              size="sm"
-              value={picked}
-              onValueChange={(v: string[]) => setPicked(v)}
-            >
-              {(tags.data ?? []).map((t) => (
-                <ToggleGroupItem key={t.id} value={t.name}>{t.name}</ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          )}
+          <Combobox multiple autoHighlight items={tagNames} value={picked} onValueChange={(v: string[]) => setPicked(v)}>
+            <ComboboxChips ref={tagAnchor}>
+              <ComboboxValue>
+                {(values: string[]) => (
+                  <Fragment>
+                    {values.map((v) => <ComboboxChip key={v}>{v}</ComboboxChip>)}
+                    <ComboboxChipsInput aria-label="Tags" placeholder={values.length ? '' : 'meat, milk…'} />
+                  </Fragment>
+                )}
+              </ComboboxValue>
+            </ComboboxChips>
+            <ComboboxContent anchor={tagAnchor}>
+              <ComboboxEmpty>No tag matches — add it below.</ComboboxEmpty>
+              <ComboboxList>
+                {(name: string) => <ComboboxItem key={name} value={name}>{name}</ComboboxItem>}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
           <Input
             aria-label="New tag"
             placeholder="New tag — press Enter"
