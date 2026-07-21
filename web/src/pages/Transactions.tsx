@@ -69,48 +69,68 @@ export default function Transactions() {
         </Empty>
       )}
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-5">
         {[...byDate.entries()].map(([date, txs]) => {
           const dayOut = txs.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
+          // one card per category, largest subtotal first (categories are kind-scoped, so a card is all-expense or all-income)
+          const byCat = new Map<string, Tx[]>()
+          for (const t of txs) {
+            const key = t.category ?? 'Uncategorized'
+            byCat.set(key, [...(byCat.get(key) ?? []), t])
+          }
+          const cards = [...byCat.entries()]
+            .map(([cat, list]) => ({ cat, list, total: list.reduce((s, t) => s + Number(t.amount), 0), type: list[0].type }))
+            .sort((a, b) => b.total - a.total)
           return (
-            <section key={date}>
-              <div className="mb-1.5 flex items-baseline justify-between px-1">
+            <section key={date} className="flex flex-col gap-3">
+              <div className="flex items-baseline justify-between px-1">
                 <Eyebrow>
                   {new Date(date + 'T00:00:00').toLocaleDateString('en-PK', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </Eyebrow>
-                {dayOut > 0 && <Amount value={dayOut} flow="out" className="text-[11px]" signed />}
+                {dayOut > 0 && <Amount value={dayOut} flow="out" className="text-xs font-semibold" />}
               </div>
-              <Card className="gap-0 py-0">
-                {txs.map((t, i) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setEditing(t)}
-                    className={cn('flex w-full items-start justify-between gap-3 px-4 py-3 text-left active:bg-accent', i > 0 && 'border-t')}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 text-sm font-medium">
-                        <span className="truncate">{t.category ?? 'Uncategorized'}</span>
-                        {t.source === 'recurring' && <Badge variant="secondary">auto</Badge>}
-                      </div>
-                      {t.tags?.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {t.tags.map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+              {cards.map(({ cat, list, total, type }) => (
+                <Card key={cat} className="gap-0 py-0">
+                  <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
+                    <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+                      <span className="truncate">{cat}</span>
+                      <Badge variant="secondary" className="shrink-0 font-normal">
+                        {list.length} item{list.length > 1 ? 's' : ''}
+                      </Badge>
+                    </span>
+                    <Amount value={total} flow={type === 'income' ? 'in' : 'out'} className="shrink-0 text-sm" />
+                  </div>
+                  {list.map((t, i) => (
+                    <button
+                      key={t.id}
+                      onClick={() => setEditing(t)}
+                      className={cn('flex w-full items-start justify-between gap-3 px-4 py-3 text-left active:bg-accent', i > 0 && 'border-t')}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 text-sm">
+                          <span className="break-words">{t.note || cat}</span>
+                          {t.source === 'recurring' && <Badge variant="secondary">auto</Badge>}
                         </div>
-                      )}
-                      <div className="text-xs break-words text-muted-foreground">
-                        {t.originalCurrency && (
-                          <>
-                            <Amount value={t.originalAmount} currency={t.originalCurrency} className="text-xs" />
-                            {' @ '}{Number(t.fxRate).toFixed(2)}{' · '}
-                          </>
+                        {t.tags?.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {t.tags.map((tag) => <Badge key={tag} variant="outline" className="font-normal">{tag}</Badge>)}
+                          </div>
                         )}
-                        {t.note ? `${t.note} · ` : ''}{t.paidBy}
+                        {t.originalCurrency && (
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            <Amount value={t.originalAmount} currency={t.originalCurrency} className="text-xs" />
+                            {' @ '}{Number(t.fxRate).toFixed(2)}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <Amount value={t.amount} flow={t.type === 'income' ? 'in' : 'out'} signed className="shrink-0 text-sm" />
-                  </button>
-                ))}
-              </Card>
+                      <div className="flex shrink-0 flex-col items-end gap-0.5">
+                        <Amount value={t.amount} flow={t.type === 'income' ? 'in' : 'out'} className="text-sm" />
+                        <span className="text-xs text-muted-foreground">{t.paidBy}</span>
+                      </div>
+                    </button>
+                  ))}
+                </Card>
+              ))}
             </section>
           )
         })}

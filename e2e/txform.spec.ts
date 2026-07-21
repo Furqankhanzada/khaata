@@ -25,7 +25,7 @@ test('expense/income toggle switches type and category list', async ({ page }) =
   await expect(page.getByText('Income added')).toBeVisible()
 
   await page.getByRole('link', { name: 'Ledger' }).click()
-  await expect(page.getByText('+Rs 75,000').first()).toBeVisible()
+  await expect(page.getByText('Rs 75,000').first()).toBeVisible() // unsigned since the category-card redesign; green = income
 })
 
 test('create tags, toggle them on an expense, and see them survive a reload', async ({ page }) => {
