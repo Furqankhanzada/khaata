@@ -2,7 +2,7 @@ import { and, eq, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db/client'
 import { loanPayments, loans } from '../db/schema'
-import { todayPk } from '../util'
+import { todayIn } from '../util'
 import type { Ctx } from '../middleware'
 import { visibilityInput } from './accounts'
 
@@ -35,7 +35,7 @@ export async function addLoan(ctx: Ctx, input: z.infer<typeof loanInput>) {
     counterparty: input.counterparty,
     direction: input.direction,
     principal: input.principal.toFixed(2),
-    startDate: input.start_date ?? todayPk(),
+    startDate: input.start_date ?? todayIn(ctx.timezone),
     visibility: input.visibility,
     note: input.note,
   }).onConflictDoNothing().returning()
@@ -80,7 +80,7 @@ export async function addLoanPayment(ctx: Ctx, loanId: string, input: z.infer<ty
     id: input.id,
     loanId,
     amount: input.amount.toFixed(2),
-    paidOn: input.paid_on ?? todayPk(),
+    paidOn: input.paid_on ?? todayIn(ctx.timezone),
     note: input.note,
   }).onConflictDoNothing()
   const updated = await getLoan(ctx, loanId)

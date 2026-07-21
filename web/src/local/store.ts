@@ -1,5 +1,6 @@
 // Snapshot lifecycle: fetch /snapshot, ingest into local SQLite, notify subscribers.
 import { batch, query, type Stmt } from './db'
+import { clearAppTz, setAppTz } from './dates'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Snapshot = Record<string, any>
@@ -74,6 +75,7 @@ async function ingest(snap: Snapshot) {
     setMetaStmt('synced_at', new Date().toISOString()),
   ]
   await batch(stmts)
+  if (snap.household?.timezone) setAppTz(snap.household.timezone)
   synced = true
 }
 
@@ -109,6 +111,7 @@ export async function clearLocal() {
     { sql: 'delete from transactions' }, { sql: 'delete from categories' }, { sql: 'delete from budgets' },
     { sql: 'delete from docs' }, { sql: 'delete from meta' }, { sql: 'delete from outbox' },
   ])
+  clearAppTz()
   synced = false
   bump()
 }

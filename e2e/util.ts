@@ -14,8 +14,9 @@ export async function type(input: Locator, text: string) {
   throw new Error(`typing "${text}" did not stick`)
 }
 
-/** Today in Pakistan time (the app's date basis) as YYYY-MM-DD — never runner-local in specs. */
-export const pkToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
+/** Today on the e2e household's calendar — onboard() creates households in the runner's device
+ *  timezone, so specs and app agree in any CI timezone. */
+export const hhToday = () => new Date().toLocaleDateString('en-CA')
 
 /** Register a fresh user and create their household; lands on the dashboard. */
 export async function onboard(page: Page) {

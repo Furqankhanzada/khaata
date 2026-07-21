@@ -89,7 +89,7 @@ export function HouseholdSetup() {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
 
-  async function go(body: { name?: string; invite_code?: string }) {
+  async function go(body: { name?: string; invite_code?: string; timezone?: string }) {
     try {
       await api('/household', { method: 'POST', json: body })
       toast(body.name ? 'Household created' : 'Joined household')
@@ -109,7 +109,14 @@ export function HouseholdSetup() {
         </CardHeader>
         <CardContent>
           <FieldGroup>
-            <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void go({ name }) }}>
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault()
+                // household clock = the creator's device timezone (changeable later in More)
+                void go({ name, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+              }}
+            >
               <Input placeholder='Household name, e.g. "Our Home"' required value={name} onChange={(e) => setName(e.target.value)} />
               <Button type="submit">Create</Button>
             </form>

@@ -13,8 +13,8 @@ const DEFAULT_CATEGORIES: [string, 'expense' | 'income'][] = [
   ['Salary', 'income'], ['Business', 'income'], ['Investment', 'income'], ['Other', 'income'],
 ]
 
-export async function createHousehold(userId: string, name: string) {
-  const [h] = await db.insert(households).values({ name, inviteCode: newInviteCode() }).returning()
+export async function createHousehold(userId: string, name: string, timezone: string) {
+  const [h] = await db.insert(households).values({ name, inviteCode: newInviteCode(), timezone }).returning()
   await db.insert(categories).values(DEFAULT_CATEGORIES.map(([n, kind]) => ({ householdId: h.id, name: n, kind })))
   await db.update(user).set({ householdId: h.id }).where(eq(user.id, userId))
   return h
@@ -34,6 +34,11 @@ export async function getHousehold(ctx: Ctx) {
     .select({ id: user.id, name: user.name, email: user.email })
     .from(user).where(eq(user.householdId, ctx.householdId))
   return { ...h, members }
+}
+
+export async function updateHousehold(ctx: Ctx, patch: { name?: string; timezone?: string }) {
+  const [h] = await db.update(households).set(patch).where(eq(households.id, ctx.householdId)).returning()
+  return h
 }
 
 export async function rotateInvite(ctx: Ctx) {

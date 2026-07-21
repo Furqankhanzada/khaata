@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { onboard, pkToday, type } from './util'
+import { onboard, hhToday, type } from './util'
 
 const monthLabel = (shift: number) => {
-  const [y, mo] = pkToday().split('-').map(Number) // PKT — the app's month, not the runner's
+  const [y, mo] = hhToday().split('-').map(Number) // the household's month (device tz in e2e)
   const m = new Date(y, mo - 1 + shift, 1)
   return m.toLocaleDateString('en-PK', { month: 'long', year: 'numeric' }).toUpperCase()
 }

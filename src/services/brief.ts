@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../db/client'
 import { zakatSettings } from '../db/schema'
-import { monthBounds, todayPk } from '../util'
+import { monthBounds, todayIn } from '../util'
 import type { Ctx } from '../middleware'
 import { listTransactions, transactionFilters } from './transactions'
 import { budgetStatus } from './budgets'
@@ -19,9 +19,9 @@ const rs = (n: number) => `Rs ${Math.round(n).toLocaleString('en-PK')}`
 
 /** Everything an agent needs for a morning summary, in one call. */
 export async function dailyBrief(ctx: Ctx) {
-  const today = todayPk()
+  const today = todayIn(ctx.timezone)
   const yesterday = addDays(today, -1)
-  const { from, toExclusive } = monthBounds()
+  const { from, toExclusive } = monthBounds(ctx.timezone)
 
   const yEntries = await listTransactions(ctx, transactionFilters.parse({ from: yesterday, to: yesterday, type: 'expense' }))
   const yesterdaySpent = yEntries.reduce((s, t) => s + Number(t.amount), 0)

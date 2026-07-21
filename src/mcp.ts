@@ -13,7 +13,9 @@ import * as accounts from './services/accounts'
 import * as zakat from './services/zakat'
 import * as fx from './services/fx'
 import * as brief from './services/brief'
+import * as household from './services/household'
 import { audit, listAudit } from './services/audit'
+import { isValidTimezone } from './util'
 
 const json = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 1) }] })
 
@@ -111,6 +113,13 @@ function buildServer(ctx: Ctx) {
     { id: z.string() }, async (a: { id: string }) => ({ deleted: await accounts.deleteAccount(ctx, a.id) }))
   tool('record_fx_rate', 'Manually record an exchange rate (PKR per 1 unit of the currency) — used when the daily feed is wrong or unavailable.',
     fx.fxRateInput.shape, (a) => fx.recordFxRate(fx.fxRateInput.parse(a)))
+
+  tool('update_household', "Update household settings: rename, or change the household timezone (an IANA name like 'Asia/Karachi'; entry dates and reports follow this clock).",
+    { name: z.string().min(1).optional(), timezone: z.string().optional() },
+    async (a: { name?: string; timezone?: string }) => {
+      if (a.timezone && !isValidTimezone(a.timezone)) return { error: 'invalid IANA timezone' }
+      return household.updateHousehold(ctx, a)
+    })
 
   tool('get_audit_log', "Audit trail: who did what and when — every create/update/delete by household members via app or agent. Other members' wealth actions (holdings/loans/accounts) are hidden per visibility rules.",
     { limit: z.coerce.number().int().min(1).max(200).default(50) }, (a: { limit: number }) => listAudit(ctx, a.limit))

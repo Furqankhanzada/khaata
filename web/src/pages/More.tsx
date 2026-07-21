@@ -124,6 +124,22 @@ function HouseholdSection({ me }: { me: Me }) {
             </InputGroupAddon>
           </InputGroup>
         </Field>
+        <Field>
+          <FieldLabel htmlFor="hh-timezone">Timezone</FieldLabel>
+          <select
+            id="hh-timezone"
+            className="h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm"
+            value={h.timezone}
+            onChange={async (e) => {
+              await api('/household', { method: 'PATCH', json: { timezone: e.target.value } })
+              qc.invalidateQueries()
+              toast('Household timezone updated')
+            }}
+          >
+            {Intl.supportedValuesOf('timeZone').map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+          </select>
+          <span className="text-xs text-muted-foreground">Entry dates, budgets and reports follow this clock.</span>
+        </Field>
       </CardContent>
     </Card>
   )

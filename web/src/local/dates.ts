@@ -2,10 +2,25 @@
 
 export type Period = 'week' | 'month' | 'quarter' | 'year'
 
-export const todayPk = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
+// The household's timezone, seeded from the snapshot (localStorage survives reloads so the
+// synchronous date helpers work before first sync); device timezone until a household exists.
+let cachedTz: string | null = null
+export function setAppTz(tz: string) {
+  cachedTz = tz
+  localStorage.setItem('hh-timezone', tz)
+}
+export function clearAppTz() {
+  cachedTz = null
+  localStorage.removeItem('hh-timezone')
+}
+export const appTz = () =>
+  cachedTz ?? localStorage.getItem('hh-timezone') ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+
+/** Today on the household's calendar as YYYY-MM-DD. */
+export const todayApp = () => new Date().toLocaleDateString('en-CA', { timeZone: appTz() })
 
 export function monthBounds(month?: string) {
-  const m = month && /^\d{4}-\d{2}$/.test(month) ? month : todayPk().slice(0, 7)
+  const m = month && /^\d{4}-\d{2}$/.test(month) ? month : todayApp().slice(0, 7)
   const [y, mo] = m.split('-').map(Number)
   const next = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, '0')}-01`
   return { month: m, from: `${m}-01`, toExclusive: next }
@@ -20,7 +35,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export type Range = { from: string; toExclusive: string; label: string; step: '1 day' | '7 days' | '1 month' }
 
 export function periodRange(period: Period, offset: number): Range {
-  const [y, m, d] = todayPk().split('-').map(Number)
+  const [y, m, d] = todayApp().split('-').map(Number)
   const today = new Date(y, m - 1, d)
   let start: Date, end: Date, label: string, step: Range['step']
 

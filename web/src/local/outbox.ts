@@ -2,7 +2,7 @@
 import { toast } from 'sonner'
 import { batch, query, type Stmt } from './db'
 import { bump, getMeta, refresh, setMetaStmt } from './store'
-import { todayPk } from './dates'
+import { todayApp } from './dates'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>
@@ -56,7 +56,7 @@ async function applyLocal(method: string, path: string, b: Row): Promise<Stmt[]>
               category_id, category, note, occurred_on, source, user_id, paid_by, ord)
             values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       bind: [b.id, b.type, mo.amount, mo.originalAmount, mo.originalCurrency, mo.fxRate,
-        b.category_id ?? null, b.category ?? null, b.note ?? null, b.occurred_on ?? todayPk(),
+        b.category_id ?? null, b.category ?? null, b.note ?? null, b.occurred_on ?? todayApp(),
         'api', me?.id ?? null, me?.name ?? null, -Date.now()],
     }]
   }
@@ -86,7 +86,7 @@ async function applyLocal(method: string, path: string, b: Row): Promise<Stmt[]>
       sql: 'insert or replace into docs(collection, id, data) values(?,?,?)',
       bind: ['loans', b.id, JSON.stringify({
         id: b.id, user_id: me?.id, counterparty: b.counterparty, direction: b.direction,
-        principal: Number(b.principal), start_date: b.start_date ?? todayPk(), status: 'open',
+        principal: Number(b.principal), start_date: b.start_date ?? todayApp(), status: 'open',
         visibility: b.visibility ?? 'private', note: b.note ?? null,
       })],
     }]
@@ -95,7 +95,7 @@ async function applyLocal(method: string, path: string, b: Row): Promise<Stmt[]>
     const loanId = m[1]
     const stmts: Stmt[] = [{
       sql: 'insert or replace into docs(collection, id, data) values(?,?,?)',
-      bind: ['loan_payments', b.id, JSON.stringify({ id: b.id, loanId, amount: Number(b.amount), paidOn: b.paid_on ?? todayPk(), note: b.note ?? null })],
+      bind: ['loan_payments', b.id, JSON.stringify({ id: b.id, loanId, amount: Number(b.amount), paidOn: b.paid_on ?? todayApp(), note: b.note ?? null })],
     }]
     // mirror the server's auto-settle when the loan is fully repaid
     const [loanRow] = await query<{ data: string }>(`select data from docs where collection = 'loans' and id = ?`, [loanId])
@@ -144,7 +144,7 @@ async function applyLocal(method: string, path: string, b: Row): Promise<Stmt[]>
     return rows.filter((r) => JSON.parse(r.data).instrument_id === b.instrument_id).map((r) => {
       const h = JSON.parse(r.data)
       h.price = Number(b.price)
-      h.price_as_of = b.as_of ?? todayPk()
+      h.price_as_of = b.as_of ?? todayApp()
       h.price_source = 'manual'
       h.value = Number(h.units) * h.price
       h.gain = h.cost != null ? h.value - h.cost : null

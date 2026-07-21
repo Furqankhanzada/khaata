@@ -10,7 +10,9 @@ export const households = pgTable('households', {
   id: id(),
   name: text('name').notNull(),
   inviteCode: text('invite_code').notNull().unique(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
+  // required at creation (device-detected in the web signup) — deliberately no product default
+  timezone: text('timezone').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 export const categories = pgTable('categories', {
@@ -49,7 +51,7 @@ export const transactions = pgTable('transactions', {
   occurredOn: date('occurred_on').notNull(),
   source: text('source').notNull().default('api'),
   recurringRuleId: text('recurring_rule_id').references(() => recurringRules.id),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('transactions_household_date_idx').on(t.householdId, t.occurredOn.desc())])
 
 export const budgets = pgTable('budgets', {
@@ -68,7 +70,7 @@ export const accounts = pgTable('accounts', {
   currency: text('currency').notNull().default('PKR'),
   zakatable: boolean('zakatable').notNull().default(true),
   visibility: text('visibility', { enum: ['shared', 'private'] }).notNull().default('private'),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 // Global (shared across households): a PSX symbol / mutual fund is the same for everyone
@@ -132,7 +134,7 @@ export const zakatSettings = pgTable('zakat_settings', {
   householdId: text('household_id').primaryKey().references(() => households.id),
   nisabAmount: numeric('nisab_amount', { precision: 14, scale: 2 }).notNull(),
   nextDueDate: date('next_due_date'),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 // Every successful mutation (REST + MCP), purged after 30 days — no FKs so rows outlive their referents
