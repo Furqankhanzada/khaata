@@ -35,7 +35,7 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
   const categories = useCategories()
   const [type, setType] = useState<'expense' | 'income'>(existing?.type ?? 'expense')
   const [amount, setAmount] = useState(existing ? String(Number(existing.originalAmount ?? existing.amount)) : '')
-  const [currency, setCurrency] = useState(existing?.originalCurrency ?? 'PKR')
+  const [currency, setCurrency] = useState(existing?.originalCurrency ?? appBase())
   const [rate, setRate] = useState(existing?.fxRate ? String(Number(existing.fxRate)) : '')
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null)
   const [note, setNote] = useState(existing?.note ?? '')
@@ -49,8 +49,8 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
     setBusy(true)
     const body = {
       type, amount: Number(amount), category_id: categoryId || undefined, note: note || undefined, occurred_on: date,
-      currency: currency !== 'PKR' ? currency : undefined,
-      fx_rate: currency !== 'PKR' && rate ? Number(rate) : undefined,
+      currency: currency !== appBase() ? currency : undefined,
+      fx_rate: currency !== appBase() && rate ? Number(rate) : undefined,
     }
     try {
       if (existing) await api(`/transactions/${existing.id}`, { method: 'PATCH', json: body })
@@ -108,7 +108,7 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
               className="amount" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)}
             />
           </InputGroup>
-          {currency !== 'PKR' && (
+          {currency !== appBase() && (
             <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
               <span className="shrink-0">1 {currency} =</span>
               <InputGroup className="w-32">

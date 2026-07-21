@@ -223,7 +223,7 @@ type Account = {
 function AccountsSection() {
   const qc = useQueryClient()
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: () => api<Account[]>('/accounts') })
-  const [form, setForm] = useState({ name: '', balance: '', currency: 'PKR' })
+  const [form, setForm] = useState({ name: '', balance: '', currency: appBase() })
   const [shared, setShared] = useState(false)
   const [managing, setManaging] = useState<Account | null>(null)
   const inval = () => { qc.invalidateQueries({ queryKey: ['accounts'] }); qc.invalidateQueries({ queryKey: ['zakat'] }) }
@@ -247,10 +247,10 @@ function AccountsSection() {
             <span className="flex flex-col">
               <span className="flex items-center gap-1.5 text-sm">
                 {a.name}
-                {a.currency !== 'PKR' && <Badge variant="secondary" className="amount">{a.currency}</Badge>}
+                {a.currency !== appBase() && <Badge variant="secondary" className="amount">{a.currency}</Badge>}
                 {a.visibility === 'shared' && <Badge variant="outline">shared</Badge>}
               </span>
-              {a.currency !== 'PKR' && (
+              {a.currency !== appBase() && (
                 <span className="text-xs text-muted-foreground">
                   {a.rate != null
                     ? <>@ {a.rate.toFixed(2)} ≈ <Amount value={a.base_balance} className="text-xs" /></>
@@ -267,7 +267,7 @@ function AccountsSection() {
             method: 'POST',
             json: { name: form.name, balance: Number(form.balance || 0), currency: form.currency, visibility: shared ? 'shared' : 'private' },
           })
-          setForm({ name: '', balance: '', currency: 'PKR' }); setShared(false); inval(); toast('Account added')
+          setForm({ name: '', balance: '', currency: appBase() }); setShared(false); inval(); toast('Account added')
         }}>
           <div className="flex gap-2">
             <Input placeholder="Account name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -281,7 +281,7 @@ function AccountsSection() {
                   {CURRENCIES.map((c) => <option key={c} value={c}>{c === appBase() ? symbolFor(c) : c}</option>)}
                 </select>
               </InputGroupAddon>
-              <InputGroupInput type="number" inputMode="decimal" step="any" min="0" placeholder="0" className="amount"
+              <InputGroupInput type="number" inputMode="decimal" step="any" min="0" placeholder="0" aria-label="Opening balance" className="amount"
                 value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} />
             </InputGroup>
             <Button type="submit" variant="outline" size="icon" aria-label="Add account"><Plus /></Button>
@@ -468,7 +468,7 @@ function RecurringSection() {
               onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
           <div className="flex gap-2">
-            <Input type="number" min="1" placeholder="Amount Rs" required className="amount"
+            <Input type="number" min="1" placeholder={`Amount ${baseSymbol()}`} required className="amount"
               value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             <InputGroup className="w-28 shrink-0">
               <InputGroupInput type="number" min="1" max="31" placeholder="Day" required
@@ -527,7 +527,7 @@ function ZakatSection() {
                 <div key={a.name} className="flex justify-between border-t py-1.5">
                   <span>
                     {a.name}
-                    {a.currency && a.currency !== 'PKR' && (
+                    {a.currency && a.currency !== appBase() && (
                       <span className="text-muted-foreground"> (<Amount value={a.native_balance} currency={a.currency} className="text-xs" />)</span>
                     )}
                   </span>
