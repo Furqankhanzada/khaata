@@ -1,4 +1,4 @@
-import { and, arrayContains, desc, eq, gte, ilike, lte } from 'drizzle-orm'
+import { and, arrayContains, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { db } from '../db/client'
@@ -45,7 +45,7 @@ export const transactionFilters = z.object({
   tags: z.array(z.string()).optional()
     .describe("Only entries carrying all of these tags, e.g. ['meat'] — exact, unlike a q search"),
   user_id: z.string().optional().describe('Filter by which household member paid'),
-  q: z.string().optional().describe('Search in notes'),
+  q: z.string().optional().describe('Search notes, tags and payer names'),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 })
@@ -131,7 +131,11 @@ export async function listTransactions(ctx: Ctx, f: z.infer<typeof transactionFi
   if (f.category_id) conds.push(eq(transactions.categoryId, f.category_id))
   if (f.tags?.length) conds.push(arrayContains(transactions.tags, f.tags)) // all of them, not any
   if (f.user_id) conds.push(eq(transactions.userId, f.user_id))
-  if (f.q) conds.push(ilike(transactions.note, `%${f.q}%`))
+  if (f.q) conds.push(or(
+    ilike(transactions.note, `%${f.q}%`),
+    ilike(user.name, `%${f.q}%`),
+    sql`array_to_string(${transactions.tags}, ' ') ilike ${'%' + f.q + '%'}`,
+  )!)
   return db.select(selection).from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
     .leftJoin(user, eq(transactions.userId, user.id))

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { json, makeUser, req } from '../helpers'
+import { inviteCodeOf, json, makeUser, req } from '../helpers'
 
 describe('transactions', () => {
   it('adds, lists, filters, updates and deletes', async () => {
@@ -23,6 +23,25 @@ describe('transactions', () => {
 
     await json(`/api/v1/transactions/${tx.id}`, { method: 'DELETE', key: u.key })
     expect((await req(`/api/v1/transactions/${tx.id}`, { key: u.key })).status).toBe(404)
+  })
+
+  it('q searches notes, tags and payer names; user_id scopes to a member', async () => {
+    const a = await makeUser({ name: 'Furqan' })
+    const b = await makeUser({ inviteCode: await inviteCodeOf(a), name: 'Ayesha' })
+    await json('/api/v1/tags', { key: a.key, json: { name: 'vegetable' } })
+    await json('/api/v1/transactions', { key: a.key, json: { type: 'expense', amount: 100, category: 'Groceries', note: 'tomato', tags: ['vegetable'] } })
+    await json('/api/v1/transactions', { key: b.key, json: { type: 'expense', amount: 200, category: 'Groceries', note: 'lemon' } })
+
+    const byTag = await json<any[]>('/api/v1/transactions?q=vegetable', { key: a.key })
+    expect(byTag.map((t) => t.note)).toEqual(['tomato'])
+    const byPayer = await json<any[]>('/api/v1/transactions?q=ayesha', { key: a.key })
+    expect(byPayer.map((t) => t.note)).toEqual(['lemon'])
+    const byNote = await json<any[]>('/api/v1/transactions?q=toma', { key: a.key })
+    expect(byNote.map((t) => t.note)).toEqual(['tomato'])
+
+    const bId = byPayer[0].userId
+    const scoped = await json<any[]>(`/api/v1/transactions?user_id=${bId}`, { key: a.key })
+    expect(scoped.map((t) => t.note)).toEqual(['lemon'])
   })
 
   it('auto-creates unknown categories by name', async () => {

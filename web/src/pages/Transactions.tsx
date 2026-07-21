@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import { api } from '../api'
 import { cn } from '@/lib/utils'
@@ -12,15 +12,34 @@ import { Spinner } from '@/components/ui/spinner'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Amount, Eyebrow, PageHeader } from '@/components/shared'
 import { TxForm, type Tx } from '../TxForm'
+import type { Me } from '../App'
 
 const PAGE = 50
 
+function MemberChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'shrink-0 rounded-full px-4 py-1.5 text-sm whitespace-nowrap transition-colors',
+        active ? 'bg-foreground font-medium text-background' : 'border border-line bg-card text-foreground',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 export default function Transactions() {
   const [q, setQ] = useState('')
+  const [member, setMember] = useState<string | null>(null)
   const [editing, setEditing] = useState<Tx | null>(null)
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') })
+  const members = me.data?.household?.members ?? []
   const list = useInfiniteQuery({
-    queryKey: ['transactions', q],
-    queryFn: ({ pageParam }) => api<Tx[]>(`/transactions?limit=${PAGE}&offset=${pageParam}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+    queryKey: ['transactions', q, member],
+    queryFn: ({ pageParam }) =>
+      api<Tx[]>(`/transactions?limit=${PAGE}&offset=${pageParam}${q ? `&q=${encodeURIComponent(q)}` : ''}${member ? `&user_id=${member}` : ''}`),
     initialPageParam: 0,
     getNextPageParam: (last, pages) => (last.length === PAGE ? pages.length * PAGE : undefined),
   })
@@ -48,8 +67,19 @@ export default function Transactions() {
         <InputGroupAddon>
           <Search />
         </InputGroupAddon>
-        <InputGroupInput placeholder="Search notes…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <InputGroupInput placeholder="Search notes, items, people…" value={q} onChange={(e) => setQ(e.target.value)} />
       </InputGroup>
+
+      {members.length > 0 && (
+        <div className="mb-4 flex gap-2 overflow-x-auto px-0.5 pb-0.5">
+          <MemberChip active={member === null} onClick={() => setMember(null)}>All</MemberChip>
+          {members.map((m) => (
+            <MemberChip key={m.id} active={member === m.id} onClick={() => setMember(m.id)}>
+              {m.name.split(' ')[0]}
+            </MemberChip>
+          ))}
+        </div>
+      )}
 
       {list.isLoading && (
         <div className="flex flex-col gap-3">

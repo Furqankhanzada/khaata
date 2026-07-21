@@ -29,7 +29,7 @@ test('ledger search filters by note', async ({ page }) => {
   await expect(page.getByText('petrol pump')).toBeVisible()
   await expect(page.getByText('karahi dinner')).toBeVisible()
 
-  await type(page.getByPlaceholder('Search notes…'), 'karahi')
+  await type(page.getByPlaceholder('Search notes, items, people…'), 'karahi')
   await expect(page.getByText('petrol pump')).toHaveCount(0)
   await expect(page.getByText('karahi dinner')).toBeVisible()
 })

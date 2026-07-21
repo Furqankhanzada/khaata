@@ -16,6 +16,12 @@ test('onboarding → add expense via drawer → visible in ledger and dashboard'
   await expect(page.getByText('e2e groceries run')).toBeVisible()
   await expect(page.getByText('Rs 1,234').first()).toBeVisible()
 
+  // member filter chips: scoping to yourself keeps your entries; All restores
+  await page.getByRole('button', { name: 'E2E', exact: true }).click()
+  await expect(page.getByText('e2e groceries run')).toBeVisible()
+  await page.getByRole('button', { name: 'All', exact: true }).click()
+  await expect(page.getByText('e2e groceries run')).toBeVisible()
+
   await page.getByRole('link', { name: 'Home' }).click()
   await expect(page.getByText('Net this month')).toBeVisible()
   await expect(page.getByText('Rs 1,234').first()).toBeVisible() // net = −1,234

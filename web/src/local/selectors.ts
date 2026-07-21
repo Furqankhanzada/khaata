@@ -125,11 +125,22 @@ export async function localRead(path: string): Promise<unknown> {
 
   if (p === '/transactions') {
     const q = params.get('q')
+    const userId = params.get('user_id')
     const limit = Number(params.get('limit') ?? 50)
     const offset = Number(params.get('offset') ?? 0)
+    const conds: string[] = []
+    const bind: unknown[] = []
+    if (q) {
+      conds.push('(note like ? or tags like ? or paid_by like ?)') // notes, items, people
+      bind.push(`%${q}%`, `%${q}%`, `%${q}%`)
+    }
+    if (userId) {
+      conds.push('user_id = ?')
+      bind.push(userId)
+    }
     return txRows(
-      `${txSelect}${q ? ' where note like ?' : ''} order by occurred_on desc, ord asc limit ? offset ?`,
-      q ? [`%${q}%`, limit, offset] : [limit, offset])
+      `${txSelect}${conds.length ? ` where ${conds.join(' and ')}` : ''} order by occurred_on desc, ord asc limit ? offset ?`,
+      [...bind, limit, offset])
   }
   const txOne = p.match(/^\/transactions\/([^/]+)$/)
   if (txOne) return (await txRows(`${txSelect} where id = ?`, [txOne[1]]))[0]
