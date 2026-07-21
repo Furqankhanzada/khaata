@@ -83,21 +83,32 @@ async function ingest(snap: Snapshot) {
   synced = true
 }
 
+const pending = async () => (await query<{ c: number }>('select count(*) as c from outbox'))[0].c > 0
+
 let refreshing: Promise<'ok' | 'unchanged' | 'unauthorized' | 'offline' | 'pending'> | null = null
 
-/** Pull the latest snapshot if it changed. Coalesces concurrent calls. */
-export function refresh() {
+/**
+ * Pull the latest snapshot if it changed. Coalesces concurrent calls.
+ * `fresh` waits out an in-flight pull first: after a write, the in-flight one was issued before it
+ * and its response can't contain it — and since ingest rebuilds every table, joining that pull
+ * would wipe the row back out of the mirror.
+ */
+export async function refresh(fresh = false) {
+  if (fresh && refreshing) await refreshing.catch(() => undefined)
   refreshing ??= (async () => {
     try {
       // never ingest over unflushed local writes — the outbox must drain first (syncNow orders this)
-      const [{ c }] = await query<{ c: number }>('select count(*) as c from outbox')
-      if (c > 0) return 'pending' as const
+      if (await pending()) return 'pending' as const
       const etag = await getMeta<string>('etag')
       const res = await fetch('/api/v1/snapshot', { headers: etag ? { 'If-None-Match': etag } : {} })
       if (res.status === 304) return 'unchanged' as const
       if (res.status === 401 || res.status === 403) return 'unauthorized' as const
       if (!res.ok) throw new Error(`snapshot ${res.status}`)
-      await ingest(await res.json())
+      const snap = await res.json()
+      // …and re-check after the round-trip: a write made *during* the fetch isn't in this response,
+      // and ingest rebuilds every table, so ingesting now would silently drop it
+      if (await pending()) return 'pending' as const
+      await ingest(snap)
       bump()
       return 'ok' as const
     } catch {

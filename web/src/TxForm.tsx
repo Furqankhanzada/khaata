@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api, baseSymbol, symbolFor, todayLocal } from './api'
@@ -9,12 +9,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import {
-  Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent,
-  ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor,
-} from '@/components/ui/combobox'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Spinner } from '@/components/ui/spinner'
+import { Badge } from '@/components/ui/badge'
+import { X } from 'lucide-react'
 import { CURRENCIES, Confirm } from '@/components/shared'
 
 export type Category = { id: string; name: string; kind: 'expense' | 'income' }
@@ -50,23 +48,39 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
   const [rate, setRate] = useState(existing?.fxRate ? String(Number(existing.fxRate)) : '')
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null)
   const [picked, setPicked] = useState<string[]>(existing?.tags ?? [])
-  const [newTag, setNewTag] = useState('')
+  const [tagQuery, setTagQuery] = useState('')
   const [note, setNote] = useState(existing?.note ?? '')
   const [date, setDate] = useState(existing?.occurredOn ?? todayLocal())
   const [busy, setBusy] = useState(false)
 
   const cats = (categories.data ?? []).filter((c) => c.kind === type)
-  const tagNames = (tags.data ?? []).map((t) => t.name)
-  const tagAnchor = useComboboxAnchor()
+  // Sticky, grow-only: a tag you just created isn't in the fetched list until the local mirror
+  // catches up, and a refetch mid-edit must never make a name disappear from the picker.
+  const seenTags = useRef(new Set<string>())
+  for (const name of [...(tags.data ?? []).map((t) => t.name), ...picked]) seenTags.current.add(name)
+  const tagNames = [...seenTags.current]
 
-  /** Adding to the vocabulary stays a deliberate act — that's what keeps tags exact. */
-  async function addTag() {
-    const name = newTag.trim()
+  const tagMatches = (q: string) => tagNames.filter((n) => n.toLowerCase().includes(q.toLowerCase()))
+
+  const select = (name: string) => setPicked((p) => (p.includes(name) ? p : [...p, name]))
+
+  /**
+   * One field does both jobs. Enter picks the matching tag, or — only when nothing matches at all —
+   * adds the word to the vocabulary and selects it. Creating stays deliberate (the name has to be
+   * one no existing tag contains), which is what keeps the vocabulary exact.
+   * Always preventDefault: an un-swallowed Enter here submits the whole entry.
+   */
+  async function onTagKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const name = tagQuery.trim()
     if (!name) return
-    setNewTag('')
+    const match = tagNames.find((n) => n.toLowerCase() === name.toLowerCase()) ?? tagMatches(name)[0]
+    setTagQuery('')
+    if (match) return select(match)
     const tag = await api<Tag>('/tags', { method: 'POST', json: { name } })
     qc.invalidateQueries({ queryKey: ['tags'] })
-    setPicked((p) => (p.includes(tag.name) ? p : [...p, tag.name]))
+    select(tag.name)
   }
 
   async function submit(e: React.FormEvent) {
@@ -172,37 +186,41 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
           </Field>
         </div>
 
-        {/* Selection and vocabulary-creation stay separate controls: the server only accepts known
-            tags, and Base UI's Combobox is likewise restricted to its items. */}
+        {/* One field searches and creates: native datalist type-ahead, Enter to pick, Enter on no
+            match to add. ponytail: a shadcn Combobox reconciles its own multi-value against `items`,
+            and silently dropped selections whenever the tag list refetched — the browser's own
+            control has no such state to fight, and the chips are plain state we own. */}
         <Field>
           <FieldLabel>Tags</FieldLabel>
-          <Combobox multiple autoHighlight items={tagNames} value={picked} onValueChange={(v: string[]) => setPicked(v)}>
-            <ComboboxChips ref={tagAnchor}>
-              <ComboboxValue>
-                {(values: string[]) => (
-                  <Fragment>
-                    {values.map((v) => <ComboboxChip key={v}>{v}</ComboboxChip>)}
-                    <ComboboxChipsInput aria-label="Tags" placeholder={values.length ? '' : 'meat, milk…'} />
-                  </Fragment>
-                )}
-              </ComboboxValue>
-            </ComboboxChips>
-            <ComboboxContent anchor={tagAnchor}>
-              <ComboboxEmpty>No tag matches — add it below.</ComboboxEmpty>
-              <ComboboxList>
-                {(name: string) => <ComboboxItem key={name} value={name}>{name}</ComboboxItem>}
-              </ComboboxList>
-            </ComboboxContent>
-          </Combobox>
+          {picked.length > 0 && (
+            <div className="mb-1.5 flex flex-wrap gap-1">
+              {picked.map((name) => (
+                <Badge key={name} variant="secondary" className="gap-1 pr-1">
+                  {name}
+                  <button
+                    type="button" aria-label={`Remove ${name}`} className="opacity-50 hover:opacity-100"
+                    onClick={() => setPicked((p) => p.filter((n) => n !== name))}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
           <Input
-            aria-label="New tag"
-            placeholder="New tag — press Enter"
-            className="mt-1.5"
-            value={newTag}
-            onChange={(e) => setNewTag(e.target.value)}
-            // Enter would submit the whole form otherwise
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addTag() } }}
+            aria-label="Tags" list="tag-options" autoComplete="off"
+            placeholder="search or add a tag…"
+            value={tagQuery}
+            onChange={(e) => {
+              // picking from the native list fires a change with the whole value, no keypress
+              const hit = tagNames.find((n) => n.toLowerCase() === e.target.value.toLowerCase())
+              if (hit) { select(hit); setTagQuery('') } else setTagQuery(e.target.value)
+            }}
+            onKeyDown={onTagKeyDown}
           />
+          <datalist id="tag-options">
+            {tagNames.filter((n) => !picked.includes(n)).map((n) => <option key={n} value={n} />)}
+          </datalist>
         </Field>
 
         <Field>

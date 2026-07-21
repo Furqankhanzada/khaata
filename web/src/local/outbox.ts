@@ -233,10 +233,11 @@ export async function mutate(method: string, path: string, body?: unknown) {
   return b
 }
 
-let flushing: Promise<void> | null = null
+let flushing: Promise<number> | null = null
 
 function flushOutbox() {
   flushing ??= (async () => {
+    let sent = 0
     try {
       for (;;) {
         const [row] = await query<{ seq: number; method: string; path: string; body: string }>(
@@ -256,18 +257,21 @@ function flushOutbox() {
         if (!res.ok && res.status >= 500) break // server trouble — retry later
         if (!res.ok) toast.error(`A change could not sync (${res.status}) and was undone`)
         await batch([{ sql: 'delete from outbox where seq = ?', bind: [row.seq] }])
+        sent++
       }
     } finally {
       flushing = null
     }
+    return sent
   })()
   return flushing
 }
 
 /** Drain the outbox, then pull the latest snapshot (refresh skips ingest while entries remain). */
 export async function syncNow() {
-  await flushOutbox()
-  const result = await refresh()
+  const sent = await flushOutbox()
+  // anything we just sent needs a pull issued after it, not one already in flight
+  const result = await refresh(sent > 0)
   bump() // pending badge updates even when nothing else changed
   return result
 }

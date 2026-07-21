@@ -7,10 +7,10 @@ async function addExpense(page: import('@playwright/test').Page, amount: string,
   await page.getByRole('combobox', { name: 'Category' }).click()
   await page.getByRole('option', { name: 'Groceries' }).click()
   if (tag) {
-    await type(page.getByLabel('New tag'), tag)
-    await page.getByLabel('New tag').press('Enter')
-    // a created tag lands selected, as a chip in the Tags field
-    await expect(page.getByRole('combobox', { name: 'Tags' }).locator('..').getByText(tag, { exact: true })).toBeVisible()
+    const tagInput = page.getByRole('combobox', { name: 'Tags' })
+    await type(tagInput, tag)
+    await tagInput.press('Enter')
+    await expect(page.getByLabel(`Remove ${tag}`)).toBeVisible() // created tags land selected
   }
   await type(page.getByLabel('Note'), note)
   await page.getByRole('button', { name: 'Add expense' }).click()

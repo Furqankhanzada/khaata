@@ -32,23 +32,37 @@ test('create tags, toggle them on an expense, and see them survive a reload', as
   await onboard(page)
   await page.getByRole('button', { name: 'Add entry' }).click()
 
-  // a new tag comes back selected, so it applies to the entry being written
-  const newTag = page.getByLabel('New tag')
-  const chips = page.getByRole('combobox', { name: 'Tags' }).locator('..')
-  for (const name of ['meat', 'chicken', 'fruit']) {
-    await type(newTag, name)
-    await newTag.press('Enter')
-    await expect(chips.getByText(name, { exact: true })).toBeVisible()
-  }
+  // one field does both jobs — no separate "new tag" box
+  const tagInput = page.getByRole('combobox', { name: 'Tags' })
+  await expect(page.getByLabel('New tag')).toHaveCount(0)
+  const typeTag = async (text: string) => { await tagInput.click(); await tagInput.pressSequentially(text) }
+  const chip = (name: string) => page.getByLabel(`Remove ${name}`)
 
-  // picking from the dropdown must ADD, never replace — the bug a single-select would hide
-  await chips.getByText('fruit', { exact: true }).locator('button').click() // remove its chip
-  await expect(chips.getByText('fruit', { exact: true })).toHaveCount(0)
-  await page.getByRole('combobox', { name: 'Tags' }).click()
-  await page.getByRole('option', { name: 'fruit' }).click()
-  for (const name of ['meat', 'chicken', 'fruit'])
-    await expect(chips.getByText(name, { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Amount')).toBeVisible() // form still open
+  // typing a name nothing matches and pressing Enter adds it to the vocabulary, selected
+  for (const name of ['meat', 'chicken', 'fruit']) {
+    await typeTag(name)
+    await tagInput.press('Enter')
+    await expect(chip(name)).toBeVisible()
+  }
+  // every one is still selected — a selection must never be dropped as the tag list refetches
+  for (const name of ['meat', 'chicken', 'fruit']) await expect(chip(name)).toBeVisible()
+
+  // a name that matches an existing tag PICKS it, never creates a second one
+  await chip('fruit').click()
+  await expect(chip('fruit')).toHaveCount(0)
+  await typeTag('fru')
+  await tagInput.press('Enter')
+  await expect(chip('fruit')).toBeVisible()
+
+  // choosing from the native list ADDs (the browser fills the whole value in one change event)
+  await chip('fruit').click()
+  await tagInput.fill('fruit')
+  for (const name of ['meat', 'chicken', 'fruit']) await expect(chip(name)).toBeVisible()
+  await expect(tagInput).toHaveValue('') // consumed into a chip, field ready for the next one
+
+  // the form is still open — Enter in the tag field must never submit the entry
+  await expect(page.getByLabel('Amount')).toBeVisible()
+  await expect(page.getByText('Expense added')).toHaveCount(0)
 
   await type(page.getByLabel('Amount'), '1800')
   await type(page.getByLabel('Note'), 'chicken breast')
