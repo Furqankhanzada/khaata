@@ -5,6 +5,7 @@ import { recurringRules, transactions } from '../db/schema'
 import { todayPk } from '../util'
 import type { Ctx } from '../middleware'
 import { addCategory } from './transactions'
+import { notify } from './events'
 
 export const recurringInput = z.object({
   id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
@@ -76,6 +77,7 @@ export async function materializeDueRules() {
 
   const rules = await db.select().from(recurringRules).where(eq(recurringRules.active, true))
   let created = 0
+  const touched = new Set<string>()
   for (const rule of rules) {
     const dueDay = Math.min(rule.dayOfMonth, daysInMonth)
     const dueDate = `${today.slice(0, 7)}-${String(dueDay).padStart(2, '0')}`
@@ -94,8 +96,10 @@ export async function materializeDueRules() {
       })
       await db.update(recurringRules).set({ lastMaterialized: today }).where(eq(recurringRules.id, rule.id))
       created++
+      touched.add(rule.householdId)
     }
   }
+  touched.forEach(notify) // cron writes aren't audited, so push explicitly
   if (created) console.log(`[recurring] materialized ${created} transaction(s)`)
   return created
 }

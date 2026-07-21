@@ -2,6 +2,7 @@ import { and, desc, eq, lt, or, sql } from 'drizzle-orm'
 import { db } from '../db/client'
 import { auditLog, user } from '../db/schema'
 import type { Ctx } from '../middleware'
+import { notify } from './events'
 
 type AuditEntry = {
   channel: 'api' | 'mcp'
@@ -18,6 +19,7 @@ export async function audit(entry: AuditEntry) {
   } catch (e) {
     console.error('[audit]', e)
   }
+  notify(entry.householdId) // audit sees every mutation — the natural place to push live-sync nudges
 }
 
 export async function purgeAuditLog() {

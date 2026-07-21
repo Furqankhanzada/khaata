@@ -24,4 +24,4 @@
 ## Test infrastructure
 
 - Integration: vitest; `test/helpers.ts` provides `getApp/req/json/makeUser/mcp`. The test DB `finance_test` is auto-created/migrated off `DATABASE_URL` (defaults to the dev container on :5433). Suites isolate through fresh users/households per test — no truncation needed.
-- E2E: `playwright.config.ts` boots the real server on :3010 against a fresh `finance_e2e` (`e2e/reset-db.mjs`). Use the `type()` helper from `e2e/util.ts` for inputs — Playwright's `fill()` doesn't reach React state on some controlled inputs.
+- E2E: `playwright.config.ts` boots the real server on :3010 against a fresh `finance_e2e` (`e2e/reset-db.mjs`). It serves `dist/public`, so after web changes run `npm run test:e2e` (builds first) — bare `npx playwright test` runs the browser against the stale previous bundle and fails confusingly. Use the `type()` helper from `e2e/util.ts` for inputs — Playwright's `fill()` doesn't reach React state on some controlled inputs.

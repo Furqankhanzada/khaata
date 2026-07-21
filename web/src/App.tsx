@@ -18,6 +18,7 @@ import More from './pages/More'
 import Activity from './pages/Activity'
 import { clearLocal, onChange } from './local/store'
 import { pendingCount, syncNow } from './local/outbox'
+import { connectLive, disconnectLive } from './local/live'
 import { Badge } from '@/components/ui/badge'
 
 export type Me = {
@@ -51,23 +52,33 @@ function useSyncEngine() {
     const unsubscribe = onChange(() => qc.invalidateQueries())
     const doSync = async () => {
       // flush queued writes first, then pull; never wipe local data while writes are still queued
-      if ((await syncNow()) === 'unauthorized' && (await pendingCount()) === 0) {
-        await clearLocal() // session gone (or another account) — drop the mirror, Login takes over
-        qc.invalidateQueries()
+      const result = await syncNow()
+      if (result === 'unauthorized') {
+        disconnectLive()
+        if ((await pendingCount()) === 0) {
+          await clearLocal() // session gone (or another account) — drop the mirror, Login takes over
+          qc.invalidateQueries()
+        }
+      } else {
+        connectLive(() => void doSync()) // push: server nudges on any household mutation
       }
     }
     void doSync()
     const onWake = () => void doSync()
     // visibilitychange is the reliable resume signal on mobile PWAs (focus often never fires there)
-    const onVisible = () => { if (!document.hidden) onWake() }
-    // cheap cross-device freshness while the app sits open: ETag poll, 304 unless something changed
-    const poll = setInterval(() => { if (!document.hidden && navigator.onLine) void doSync() }, 30_000)
+    const onVisible = () => {
+      if (document.hidden) disconnectLive() // no point holding a stream in the background
+      else onWake()
+    }
+    // slow fallback poll — safety net for a silently dead stream, push is the mechanism
+    const poll = setInterval(() => { if (!document.hidden && navigator.onLine) void doSync() }, 300_000)
     window.addEventListener('focus', onWake)
     window.addEventListener('online', onWake)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       unsubscribe()
       clearInterval(poll)
+      disconnectLive()
       window.removeEventListener('focus', onWake)
       window.removeEventListener('online', onWake)
       document.removeEventListener('visibilitychange', onVisible)

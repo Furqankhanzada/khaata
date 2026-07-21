@@ -17,6 +17,8 @@ import * as fx from './services/fx'
 import * as brief from './services/brief'
 import { audit, listAudit } from './services/audit'
 import { getSnapshot } from './services/snapshot'
+import { subscribe } from './services/events'
+import { streamSSE } from 'hono/streaming'
 
 // ponytail: single routes file — every handler is parse → service → json
 export const api = new Hono<AuthEnv>()
@@ -56,6 +58,18 @@ api.post('/household', async (c) => {
 api.use('*', requireHousehold)
 
 api.get('/household', async (c) => c.json(await household.getHousehold(hctx(c))))
+// live sync: one SSE event per household mutation; clients react by pulling the snapshot
+api.get('/events', (c) =>
+  streamSSE(c, async (stream) => {
+    const unsubscribe = subscribe(hctx(c).householdId, () => void stream.writeSSE({ event: 'changed', data: '1' }))
+    stream.onAbort(unsubscribe)
+    // 25s heartbeat: keeps the Cloudflare tunnel (100s idle cutoff) from dropping the stream
+    while (!stream.aborted) {
+      await stream.writeSSE({ event: 'ping', data: '' })
+      await stream.sleep(25_000)
+    }
+  }))
+
 api.get('/snapshot', async (c) => {
   const snap = await getSnapshot(hctx(c))
   const etag = `"${snap.hash}"`
