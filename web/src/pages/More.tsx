@@ -248,15 +248,19 @@ function AccountsSection() {
         }}>
           <div className="flex gap-2">
             <Input placeholder="Account name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <select
-              aria-label="Currency"
-              className="amount rounded-lg border border-input bg-transparent px-2 text-sm"
-              value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}
-            >
-              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <Input type="number" placeholder="0" className="amount w-24" value={form.balance}
-              onChange={(e) => setForm({ ...form, balance: e.target.value })} />
+            <InputGroup className="w-36 shrink-0">
+              <InputGroupAddon>
+                <select
+                  aria-label="Currency"
+                  className="amount bg-transparent text-sm outline-none"
+                  value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                >
+                  {CURRENCIES.map((c) => <option key={c} value={c}>{c === 'PKR' ? 'Rs' : c}</option>)}
+                </select>
+              </InputGroupAddon>
+              <InputGroupInput type="number" inputMode="decimal" step="any" min="0" placeholder="0" className="amount"
+                value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} />
+            </InputGroup>
             <Button type="submit" variant="outline" size="icon" aria-label="Add account"><Plus /></Button>
           </div>
           <ShareSwitch checked={shared} onChange={setShared} />
@@ -298,23 +302,22 @@ function ManageAccount({ a, onDone }: { a: Account; onDone: () => void }) {
           <FieldLabel htmlFor="account-name">Name</FieldLabel>
           <Input id="account-name" required value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <div className="flex gap-2">
-          <Field className="flex-1">
-            <FieldLabel htmlFor="account-balance">Balance</FieldLabel>
-            <Input id="account-balance" type="number" step="any" min="0" required className="amount"
+        <Field>
+          <FieldLabel htmlFor="account-balance">Balance</FieldLabel>
+          <InputGroup>
+            <InputGroupAddon>
+              <select
+                aria-label="Currency"
+                className="amount bg-transparent text-sm outline-none"
+                value={currency} onChange={(e) => setCurrency(e.target.value)}
+              >
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c === 'PKR' ? 'Rs' : c}</option>)}
+              </select>
+            </InputGroupAddon>
+            <InputGroupInput id="account-balance" type="number" inputMode="decimal" step="any" min="0" required className="amount"
               value={balance} onChange={(e) => setBalance(e.target.value)} />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="account-currency">Currency</FieldLabel>
-            <select
-              id="account-currency"
-              className="amount h-9 rounded-lg border border-input bg-transparent px-2 text-sm"
-              value={currency} onChange={(e) => setCurrency(e.target.value)}
-            >
-              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </Field>
-        </div>
+          </InputGroup>
+        </Field>
         <Button type="submit">Save</Button>
       </form>
 

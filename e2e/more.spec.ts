@@ -53,6 +53,10 @@ test('accounts: add, edit in drawer, share, zakat reacts, delete', async ({ page
   await expect(drawer.getByText('Edit account')).toBeVisible()
   await type(page.getByLabel('Name', { exact: true }), 'Meezan savings')
   await type(page.getByLabel('Balance', { exact: true }), '120000')
+  // regression guard: the InputGroup addon select must keep focus when clicked
+  const currency = drawer.getByLabel('Currency')
+  await currency.click()
+  await expect(currency).toBeFocused()
   await drawer.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('Meezan savings updated')).toBeVisible()
   await expect(page.getByText('Rs 120,000').first()).toBeVisible()
