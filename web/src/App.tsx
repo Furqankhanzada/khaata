@@ -58,12 +58,19 @@ function useSyncEngine() {
     }
     void doSync()
     const onWake = () => void doSync()
+    // visibilitychange is the reliable resume signal on mobile PWAs (focus often never fires there)
+    const onVisible = () => { if (!document.hidden) onWake() }
+    // cheap cross-device freshness while the app sits open: ETag poll, 304 unless something changed
+    const poll = setInterval(() => { if (!document.hidden && navigator.onLine) void doSync() }, 30_000)
     window.addEventListener('focus', onWake)
     window.addEventListener('online', onWake)
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       unsubscribe()
+      clearInterval(poll)
       window.removeEventListener('focus', onWake)
       window.removeEventListener('online', onWake)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [qc])
 }
