@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api, baseSymbol, symbolFor, todayLocal } from './api'
@@ -9,10 +9,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Combobox, ComboboxChip, ComboboxChips, ComboboxChipsInput, ComboboxContent,
+  ComboboxEmpty, ComboboxItem, ComboboxList, ComboboxValue, useComboboxAnchor,
+} from '@/components/ui/combobox'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Spinner } from '@/components/ui/spinner'
-import { Badge } from '@/components/ui/badge'
-import { X } from 'lucide-react'
 import { CURRENCIES, Confirm } from '@/components/shared'
 
 export type Category = { id: string; name: string; kind: 'expense' | 'income' }
@@ -49,16 +51,20 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null)
   const [picked, setPicked] = useState<string[]>(existing?.tags ?? [])
   const [tagQuery, setTagQuery] = useState('')
+  const [tagsVersion, setTagsVersion] = useState(0)
   const [note, setNote] = useState(existing?.note ?? '')
   const [date, setDate] = useState(existing?.occurredOn ?? todayLocal())
   const [busy, setBusy] = useState(false)
 
   const cats = (categories.data ?? []).filter((c) => c.kind === type)
-  // Sticky, grow-only: a tag you just created isn't in the fetched list until the local mirror
-  // catches up, and a refetch mid-edit must never make a name disappear from the picker.
-  const seenTags = useRef(new Set<string>())
-  for (const name of [...(tags.data ?? []).map((t) => t.name), ...picked]) seenTags.current.add(name)
-  const tagNames = [...seenTags.current]
+  const tagAnchor = useComboboxAnchor()
+  // Grow-only AND reference-stable: the combobox reconciles its value against `items`, so a list
+  // that shrinks (mirror lag) or is rebuilt every render makes it silently drop your selections.
+  const [tagNames, setTagNames] = useState<string[]>(existing?.tags ?? [])
+  useEffect(() => {
+    const incoming = [...(tags.data ?? []).map((t) => t.name), ...picked]
+    setTagNames((prev) => (incoming.every((n) => prev.includes(n)) ? prev : [...new Set([...prev, ...incoming])]))
+  }, [tags.data, picked])
 
   const tagMatches = (q: string) => tagNames.filter((n) => n.toLowerCase().includes(q.toLowerCase()))
 
@@ -80,7 +86,9 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
     if (match) return select(match)
     const tag = await api<Tag>('/tags', { method: 'POST', json: { name } })
     qc.invalidateQueries({ queryKey: ['tags'] })
-    select(tag.name)
+    // the combobox owns its selection; remount it with the new tag already chosen
+    setPicked((p) => (p.includes(tag.name) ? p : [...p, tag.name]))
+    setTagsVersion((v) => v + 1)
   }
 
   async function submit(e: React.FormEvent) {
@@ -186,41 +194,37 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
           </Field>
         </div>
 
-        {/* One field searches and creates: native datalist type-ahead, Enter to pick, Enter on no
-            match to add. ponytail: a shadcn Combobox reconciles its own multi-value against `items`,
-            and silently dropped selections whenever the tag list refetched — the browser's own
-            control has no such state to fight, and the chips are plain state we own. */}
+        {/* shadcn's multi-select: chips live inside the field, type to filter, Enter on a name
+            nothing matches adds it to the vocabulary. `items` must be stable and grow-only —
+            the combobox reconciles its value against it, so a shrinking list drops selections. */}
         <Field>
           <FieldLabel>Tags</FieldLabel>
-          {picked.length > 0 && (
-            <div className="mb-1.5 flex flex-wrap gap-1">
-              {picked.map((name) => (
-                <Badge key={name} variant="secondary" className="gap-1 pr-1">
-                  {name}
-                  <button
-                    type="button" aria-label={`Remove ${name}`} className="opacity-50 hover:opacity-100"
-                    onClick={() => setPicked((p) => p.filter((n) => n !== name))}
-                  >
-                    <X className="size-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
-          <Input
-            aria-label="Tags" list="tag-options" autoComplete="off"
-            placeholder="search or add a tag…"
-            value={tagQuery}
-            onChange={(e) => {
-              // picking from the native list fires a change with the whole value, no keypress
-              const hit = tagNames.find((n) => n.toLowerCase() === e.target.value.toLowerCase())
-              if (hit) { select(hit); setTagQuery('') } else setTagQuery(e.target.value)
-            }}
-            onKeyDown={onTagKeyDown}
-          />
-          <datalist id="tag-options">
-            {tagNames.filter((n) => !picked.includes(n)).map((n) => <option key={n} value={n} />)}
-          </datalist>
+          <Combobox
+            key={tagsVersion} multiple autoHighlight items={tagNames}
+            defaultValue={picked} onValueChange={(v: string[]) => setPicked(v)}
+            inputValue={tagQuery} onInputValueChange={(v: string) => setTagQuery(v)}
+          >
+            <ComboboxChips ref={tagAnchor}>
+              <ComboboxValue>
+                {(values: string[]) => (
+                  <Fragment>
+                    {values.map((v) => <ComboboxChip key={v}>{v}</ComboboxChip>)}
+                    <ComboboxChipsInput
+                      aria-label="Tags"
+                      placeholder={values.length ? '' : 'search or add a tag…'}
+                      onKeyDown={onTagKeyDown}
+                    />
+                  </Fragment>
+                )}
+              </ComboboxValue>
+            </ComboboxChips>
+            <ComboboxContent anchor={tagAnchor}>
+              <ComboboxEmpty>Press Enter to add “{tagQuery.trim()}”</ComboboxEmpty>
+              <ComboboxList>
+                {(name: string) => <ComboboxItem key={name} value={name}>{name}</ComboboxItem>}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
         </Field>
 
         <Field>

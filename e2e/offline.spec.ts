@@ -7,10 +7,12 @@ async function addExpense(page: import('@playwright/test').Page, amount: string,
   await page.getByRole('combobox', { name: 'Category' }).click()
   await page.getByRole('option', { name: 'Groceries' }).click()
   if (tag) {
+    // not the type() helper: its select-all would select the chips, and typing would delete them
     const tagInput = page.getByRole('combobox', { name: 'Tags' })
-    await type(tagInput, tag)
+    await tagInput.click()
+    await tagInput.pressSequentially(tag)
     await tagInput.press('Enter')
-    await expect(page.getByLabel(`Remove ${tag}`)).toBeVisible() // created tags land selected
+    await expect(tagInput.locator('..').getByText(tag, { exact: true })).toBeVisible() // lands selected
   }
   await type(page.getByLabel('Note'), note)
   await page.getByRole('button', { name: 'Add expense' }).click()

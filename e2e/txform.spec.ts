@@ -36,7 +36,8 @@ test('create tags, toggle them on an expense, and see them survive a reload', as
   const tagInput = page.getByRole('combobox', { name: 'Tags' })
   await expect(page.getByLabel('New tag')).toHaveCount(0)
   const typeTag = async (text: string) => { await tagInput.click(); await tagInput.pressSequentially(text) }
-  const chip = (name: string) => page.getByLabel(`Remove ${name}`)
+  const chips = tagInput.locator('..')
+  const chip = (name: string) => chips.getByText(name, { exact: true })
 
   // typing a name nothing matches and pressing Enter adds it to the vocabulary, selected
   for (const name of ['meat', 'chicken', 'fruit']) {
@@ -48,17 +49,17 @@ test('create tags, toggle them on an expense, and see them survive a reload', as
   for (const name of ['meat', 'chicken', 'fruit']) await expect(chip(name)).toBeVisible()
 
   // a name that matches an existing tag PICKS it, never creates a second one
-  await chip('fruit').click()
+  await chip('fruit').locator('button').click() // the chip's own × removes it
   await expect(chip('fruit')).toHaveCount(0)
   await typeTag('fru')
   await tagInput.press('Enter')
-  await expect(chip('fruit')).toBeVisible()
+  await expect(chip('fruit')).toHaveCount(1)
 
-  // choosing from the native list ADDs (the browser fills the whole value in one change event)
-  await chip('fruit').click()
-  await tagInput.fill('fruit')
+  // picking from the dropdown ADDs to the selection rather than replacing it
+  await chip('fruit').locator('button').click()
+  await typeTag('fr')
+  await page.getByRole('option', { name: 'fruit' }).click()
   for (const name of ['meat', 'chicken', 'fruit']) await expect(chip(name)).toBeVisible()
-  await expect(tagInput).toHaveValue('') // consumed into a chip, field ready for the next one
 
   // the form is still open — Enter in the tag field must never submit the entry
   await expect(page.getByLabel('Amount')).toBeVisible()
