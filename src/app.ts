@@ -25,6 +25,12 @@ export function buildApp() {
   app.route('/mcp', mcpApp)
 
   // built SPA (dist/public) with SPA fallback
+  // hashed assets cache forever; everything else (index.html, sw.js, manifest) revalidates
+  // on every load so new deploys reach devices on their next open
+  app.use('*', async (c, next) => {
+    await next()
+    c.header('Cache-Control', c.req.path.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache')
+  })
   app.use('*', serveStatic({ root: './dist/public' }))
   app.get('*', serveStatic({ path: './dist/public/index.html' }))
 
