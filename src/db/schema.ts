@@ -11,8 +11,11 @@ export const households = pgTable('households', {
   id: id(),
   name: text('name').notNull(),
   inviteCode: text('invite_code').notNull().unique(),
-  // required at creation (device-detected in the web signup) — deliberately no product default
+  // both required at creation (captured in the web signup) — deliberately no product defaults.
+  // base_currency is IMMUTABLE after creation: amounts are stored converted-to-base at locked
+  // rates, so flipping the base later would misstate all history.
   timezone: text('timezone').notNull(),
+  baseCurrency: text('base_currency').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -113,6 +116,9 @@ export const prices = pgTable('prices', {
   instrumentId: text('instrument_id').notNull().references(() => instruments.id),
   asOf: date('as_of').notNull(),
   price: numeric('price', { precision: 14, scale: 4 }).notNull(),
+  // PSX/MUFAP feeds quote in PKR (a data-source fact, hence a real default);
+  // manual valuations record in the household's base currency
+  currency: text('currency').notNull().default('PKR'),
   source: text('source', { enum: ['psx', 'mufap', 'manual'] }).notNull(),
 }, (t) => [primaryKey({ columns: [t.instrumentId, t.asOf] })])
 

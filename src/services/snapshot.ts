@@ -8,7 +8,7 @@ import * as loans from './loans'
 import * as accounts from './accounts'
 import * as recurring from './recurring'
 import * as portfolio from './portfolio'
-import { BASE } from './fx'
+
 
 /** FNV-1a — cheap stable content hash for the ETag; not cryptographic, doesn't need to be. */
 function hashOf(s: string) {
@@ -41,7 +41,7 @@ export async function getSnapshot(ctx: Ctx) {
       db.select().from(zakatSettings).where(eq(zakatSettings.householdId, ctx.householdId)).then((r) => r[0] ?? null),
       db.execute(sql`
         select distinct on (quote) quote, rate::float8 as rate, as_of::text as as_of
-        from fx_rates where base = ${BASE} order by quote, as_of desc`).then((r) => r.rows),
+        from fx_rates where base = ${ctx.baseCurrency} order by quote, as_of desc`).then((r) => r.rows),
     ])
   const payments = loanList.length
     ? await db.select().from(loanPayments).where(inArray(loanPayments.loanId, loanList.map((l) => l.id)))

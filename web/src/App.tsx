@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge'
 
 export type Me = {
   user: { id: string; name: string; email: string; householdId: string | null }
-  household: { id: string; name: string; inviteCode: string; timezone: string; members: { id: string; name: string; email: string }[] } | null
+  household: { id: string; name: string; inviteCode: string; timezone: string; baseCurrency: string; members: { id: string; name: string; email: string }[] } | null
 }
 
 function Tab({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: string }) {

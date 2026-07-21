@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '../api'
+import { api, baseSymbol } from '../api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -157,7 +157,7 @@ function AddLoan({ onDone }: { onDone: () => void }) {
           <Field>
             <FieldLabel htmlFor="l-amount">Amount</FieldLabel>
             <InputGroup>
-              <InputGroupAddon>Rs</InputGroupAddon>
+              <InputGroupAddon>{baseSymbol()}</InputGroupAddon>
               <InputGroupInput id="l-amount" type="number" min="1" required className="amount"
                 value={form.principal} onChange={(e) => setForm({ ...form, principal: e.target.value })} />
             </InputGroup>
@@ -251,7 +251,7 @@ function LoanStatement({ id, onDone }: { id: string; onDone: () => void }) {
           <>
             <form className="flex items-center gap-2" onSubmit={pay}>
               <InputGroup className="flex-1">
-                <InputGroupAddon>Rs</InputGroupAddon>
+                <InputGroupAddon>{baseSymbol()}</InputGroupAddon>
                 <InputGroupInput type="number" min="1" required placeholder="Repayment amount"
                   className="amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </InputGroup>
@@ -260,7 +260,7 @@ function LoanStatement({ id, onDone }: { id: string; onDone: () => void }) {
             <Confirm
               title="Settle this loan?"
               description={l.outstanding > 0
-                ? `The remaining Rs ${l.outstanding.toLocaleString()} will be marked as forgiven.`
+                ? `The remaining ${baseSymbol()} ${l.outstanding.toLocaleString()} will be marked as forgiven.`
                 : 'The loan is fully repaid and will move to Settled.'}
               actionLabel="Settle"
               onConfirm={() => setStatus('settled')}

@@ -7,7 +7,7 @@ import type { Ctx } from '../middleware'
 import { visibilityInput } from './accounts'
 import { fetchPsxClose } from './prices/psx'
 import { fetchMufapNavs, norm } from './prices/mufap'
-import { marketToday, refreshFxRates } from './fx'
+import { latestRatesMap, marketToday, refreshFxRates } from './fx'
 
 export const instrumentInput = z.object({
   id: z.string().uuid().optional().describe('Client-generated id — makes offline-sync replays idempotent'),
@@ -132,18 +132,24 @@ export async function getPortfolio(ctx: Ctx) {
   const { rows } = await db.execute(sql`
     select h.id as holding_id, i.id as instrument_id, i.kind, i.symbol, i.name,
            h.units::float8 as units, h.avg_cost::float8 as avg_cost, h.zakatable, h.visibility, h.note,
-           p.price::float8 as price, p.as_of::text as price_as_of, p.source as price_source,
-           (h.units * p.price)::float8 as value,
-           (h.units * h.avg_cost)::float8 as cost,
-           (h.units * p.price - h.units * h.avg_cost)::float8 as gain
+           p.price::float8 as price, p.currency as price_currency, p.as_of::text as price_as_of, p.source as price_source,
+           (h.units * h.avg_cost)::float8 as cost
     from holdings h
     join instruments i on i.id = h.instrument_id
     left join lateral (
-      select price, as_of, source from prices where instrument_id = i.id order by as_of desc limit 1
+      select price, currency, as_of, source from prices where instrument_id = i.id order by as_of desc limit 1
     ) p on true
     where h.household_id = ${ctx.householdId}
-      and (h.visibility = 'shared' or h.user_id = ${ctx.userId} or h.user_id is null)
-    order by value desc nulls last`)
+      and (h.visibility = 'shared' or h.user_id = ${ctx.userId} or h.user_id is null)`)
+  // price currency -> household base at the latest stored rate (1 when they match; null rate = unpriced)
+  const fxMap = await latestRatesMap(ctx.baseCurrency)
+  const rateFor = (c: string | null) => (c == null || c === ctx.baseCurrency ? 1 : (fxMap[c] ?? null))
+  for (const r of rows as Record<string, unknown>[]) {
+    const rate = r.price != null ? rateFor(r.price_currency as string) : null
+    r.value = rate != null && r.price != null ? Number(r.units) * Number(r.price) * rate : null
+    r.gain = r.value != null && r.cost != null ? Number(r.value) - Number(r.cost) : null
+  }
+  rows.sort((a, b) => (Number(b.value) || -1) - (Number(a.value) || -1))
   // gain only over priced holdings, so a missing NAV doesn't read as a loss
   const priced = rows.filter(r => r.value != null)
   const total = priced.reduce((s, r) => s + Number(r.value), 0)
@@ -155,17 +161,18 @@ export async function getPortfolio(ctx: Ctx) {
     total_cost: totalCost,
     total_gain: total - totalCost,
     unpriced_holdings: unpriced || undefined,
-    currency: 'PKR',
+    currency: ctx.baseCurrency,
   }
 }
 
-export async function recordPrice(input: z.infer<typeof priceInput>) {
+export async function recordPrice(ctx: Ctx, input: z.infer<typeof priceInput>) {
   const asOf = input.as_of ?? marketToday()
+  // manual valuations are entered in the household's base currency
   const [row] = await db.insert(prices)
-    .values({ instrumentId: input.instrument_id, asOf, price: input.price.toFixed(4), source: 'manual' })
+    .values({ instrumentId: input.instrument_id, asOf, price: input.price.toFixed(4), currency: ctx.baseCurrency, source: 'manual' })
     .onConflictDoUpdate({
       target: [prices.instrumentId, prices.asOf],
-      set: { price: input.price.toFixed(4), source: 'manual' },
+      set: { price: input.price.toFixed(4), currency: ctx.baseCurrency, source: 'manual' },
     }).returning()
   return row
 }
@@ -216,6 +223,5 @@ export async function refreshPrices() {
   if (result.errors.length) console.warn('[prices]', result.errors.join('; '))
   // one "refresh market data" action: prices + FX rates together
   const fx = await refreshFxRates()
-  if (fx.error) result.errors.push(`FX: ${fx.error}`)
   return { ...result, fx_rates_updated: fx.updated }
 }

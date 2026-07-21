@@ -23,6 +23,16 @@ export function monthBounds(tz: string, month?: string) {
   return { month: m, from: `${m}-01`, toExclusive: next }
 }
 
+/** True when ICU knows the ISO-4217 currency code. */
+export function isValidCurrency(code: string): boolean {
+  return /^[A-Z]{3}$/.test(code) && Intl.supportedValuesOf('currency').includes(code)
+}
+
+/** Display symbol for amounts in a household's base currency ('Rs 3,000', '$3,000', 'AED 3,000'). */
+export function symbolFor(code: string): string {
+  return { PKR: 'Rs', USD: '$', EUR: '\u20ac', GBP: '\u00a3', INR: '\u20b9' }[code] ?? code
+}
+
 export function newInviteCode(): string {
   return crypto.randomBytes(4).toString('hex')
 }

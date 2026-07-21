@@ -1,6 +1,7 @@
 import { createAuthClient } from 'better-auth/react'
 import { apiKeyClient } from '@better-auth/api-key/client'
 import { localRead } from './local/selectors'
+import { appBase } from './local/dates'
 import { refresh } from './local/store'
 import { isQueueable, mutate } from './local/outbox'
 
@@ -44,6 +45,12 @@ export async function api<T = unknown>(path: string, opts?: RequestInit & { json
 /** Today on the household's calendar as YYYY-MM-DD — entry defaults follow the household clock. */
 export { todayApp as todayLocal } from './local/dates'
 
+/** Display symbol for the household's base currency. */
+export const symbolFor = (code: string): string =>
+  ({ PKR: 'Rs', USD: '$', EUR: '\u20ac', GBP: '\u00a3', INR: '\u20b9' })[code] ?? code
+
+export const baseSymbol = () => symbolFor(appBase())
+
 export const rupees = new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 })
 export const fmt = (n: number | string | null | undefined) =>
-  n == null ? '—' : `Rs ${rupees.format(Number(n))}`
+  n == null ? '—' : `${baseSymbol()} ${rupees.format(Number(n))}`

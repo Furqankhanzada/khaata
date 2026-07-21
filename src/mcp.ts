@@ -30,7 +30,7 @@ function buildServer(ctx: Ctx) {
       return result
     })
 
-  tool('add_transaction', "Record an expense or income in the household ledger. Amounts are PKR by default; for foreign spending pass currency (e.g. amount: 20, currency: 'USD' for $20 spent in Dubai) — it's converted to PKR once at the day's rate (or an explicit fx_rate) and the original is preserved. The payer is the owner of the API key. Split an itemised bill into one transaction per item and tag each with what it was — broad and specific together, e.g. chicken breast → tags ['meat','chicken'].",
+  tool('add_transaction', "Record an expense or income in the household ledger. Amounts are in the household base currency by default; for foreign spending pass currency (e.g. amount: 20, currency: 'USD') — it's converted to the base once at the day's rate (or an explicit fx_rate) and the original is preserved. The payer is the owner of the API key. Split an itemised bill into one transaction per item and tag each with what it was — broad and specific together, e.g. chicken breast → tags ['meat','chicken'].",
     tx.transactionInput.shape, (a) => tx.addTransaction(ctx, a))
   tool('list_transactions', "List/search household transactions with optional date, type, category, tag, member and text filters. To total what was bought (meat, milk, fruit) use tags — q searches free text and will match unrelated notes, e.g. a 'chicken burger' dining entry is not meat.",
     tx.transactionFilters.shape, (a) => tx.listTransactions(ctx, tx.transactionFilters.parse(a)))
@@ -67,7 +67,7 @@ function buildServer(ctx: Ctx) {
     },
     (a: reports.OverviewOpts) => reports.overviewReport(ctx, a))
 
-  tool('get_portfolio', "Investment holdings visible to you (your own + household-shared) with latest prices/NAVs, value, cost and gain (PKR). Wealth items are private per member by default; visibility: 'shared' exposes one to the household.",
+  tool('get_portfolio', "Investment holdings visible to you (your own + household-shared) with latest prices/NAVs, value, cost and gain (household base currency). Wealth items are private per member by default; visibility: 'shared' exposes one to the household.",
     {}, () => portfolio.getPortfolio(ctx))
   tool('list_instruments', 'Search known instruments (PSX stocks, mutual funds, other assets).',
     { search: z.string().optional() }, (a: { search?: string }) => portfolio.searchInstruments(a.search))
@@ -83,7 +83,7 @@ function buildServer(ctx: Ctx) {
     { instrument_id: z.string(), ...portfolio.instrumentUpdate.shape },
     async (a: { instrument_id: string }) => (await portfolio.updateInstrument(ctx, a.instrument_id, portfolio.instrumentUpdate.parse(a))) ?? { error: 'not found' })
   tool('record_price', 'Manually record a price/NAV/valuation for an instrument (wins over auto-fetched prices).',
-    portfolio.priceInput.shape, (a) => portfolio.recordPrice(portfolio.priceInput.parse(a)))
+    portfolio.priceInput.shape, (a) => portfolio.recordPrice(ctx, portfolio.priceInput.parse(a)))
   tool('refresh_prices', 'Fetch latest market data now: PSX closing prices, MUFAP fund NAVs, and exchange rates.', {}, () => portfolio.refreshPrices())
 
   tool('add_loan', 'Record money lent to or borrowed from someone (qarz).', loans.loanInput.shape, (a) => loans.addLoan(ctx, loans.loanInput.parse(a)))
@@ -117,7 +117,7 @@ function buildServer(ctx: Ctx) {
   tool('delete_account', 'Delete a cash/bank account by id (its balance stops counting toward zakat).',
     { id: z.string() }, async (a: { id: string }) => ({ deleted: await accounts.deleteAccount(ctx, a.id) }))
   tool('record_fx_rate', 'Manually record an exchange rate (PKR per 1 unit of the currency) — used when the daily feed is wrong or unavailable.',
-    fx.fxRateInput.shape, (a) => fx.recordFxRate(fx.fxRateInput.parse(a)))
+    fx.fxRateInput.shape, (a) => fx.recordFxRate(ctx.baseCurrency, fx.fxRateInput.parse(a)))
 
   tool('update_household', "Update household settings: rename, or change the household timezone (an IANA name like 'Asia/Karachi'; entry dates and reports follow this clock).",
     { name: z.string().min(1).optional(), timezone: z.string().optional() },

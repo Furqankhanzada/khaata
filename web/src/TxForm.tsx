@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api, todayLocal } from './api'
+import { api, baseSymbol, symbolFor, todayLocal } from './api'
+import { appBase } from './local/dates'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -41,7 +42,7 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
   const tags = useTags()
   const [type, setType] = useState<'expense' | 'income'>(existing?.type ?? 'expense')
   const [amount, setAmount] = useState(existing ? String(Number(existing.originalAmount ?? existing.amount)) : '')
-  const [currency, setCurrency] = useState(existing?.originalCurrency ?? 'PKR')
+  const [currency, setCurrency] = useState(existing?.originalCurrency ?? appBase())
   const [rate, setRate] = useState(existing?.fxRate ? String(Number(existing.fxRate)) : '')
   const [categoryId, setCategoryId] = useState<string | null>(existing?.categoryId ?? null)
   const [picked, setPicked] = useState<string[]>(existing?.tags ?? [])
@@ -68,8 +69,8 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
     const body = {
       type, amount: Number(amount), category_id: categoryId || undefined, tags: picked,
       note: note || undefined, occurred_on: date,
-      currency: currency !== 'PKR' ? currency : undefined,
-      fx_rate: currency !== 'PKR' && rate ? Number(rate) : undefined,
+      currency: currency !== appBase() ? currency : undefined,
+      fx_rate: currency !== appBase() && rate ? Number(rate) : undefined,
     }
     try {
       if (existing) await api(`/transactions/${existing.id}`, { method: 'PATCH', json: body })
@@ -119,7 +120,7 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
               >
-                {CURRENCIES.map((c) => <option key={c} value={c}>{c === 'PKR' ? 'Rs' : c}</option>)}
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c === appBase() ? symbolFor(c) : c}</option>)}
               </select>
             </InputGroupAddon>
             <InputGroupInput
@@ -127,15 +128,16 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
               className="amount" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)}
             />
           </InputGroup>
-          {currency !== 'PKR' && (
+          {currency !== appBase() && (
             <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
               <span className="shrink-0">1 {currency} =</span>
-              <InputGroup className="w-32">
-                <InputGroupAddon>Rs</InputGroupAddon>
-                <InputGroupInput type="number" step="any" min="0.0001" placeholder="auto"
+              {/* flex, not fixed width: base-per-quote rates can be long either way (280 or 0.00359871) */}
+              <InputGroup className="min-w-28 flex-1">
+                <InputGroupAddon>{baseSymbol()}</InputGroupAddon>
+                <InputGroupInput type="number" step="any" min="0.00000001" placeholder="auto"
                   className="amount" value={rate} onChange={(e) => setRate(e.target.value)} />
               </InputGroup>
-              <span>leave blank for today's rate</span>
+              <span className="shrink-0">blank = today's rate</span>
             </div>
           )}
         </Field>
@@ -205,7 +207,7 @@ export function TxForm({ existing, onDone }: { existing?: Tx; onDone?: () => voi
           {existing && (
             <Confirm
               title="Delete this entry?"
-              description={`${existing.category ?? 'Uncategorized'} · Rs ${Number(existing.amount)} on ${existing.occurredOn}`}
+              description={`${existing.category ?? 'Uncategorized'} · ${baseSymbol()} ${Number(existing.amount)} on ${existing.occurredOn}`}
               actionLabel="Delete"
               onConfirm={del}
               trigger={<Button type="button" variant="outline" className="text-destructive">Delete</Button>}

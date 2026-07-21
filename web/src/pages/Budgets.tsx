@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api } from '../api'
+import { api, baseSymbol } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -31,7 +31,7 @@ export default function Budgets() {
     qc.invalidateQueries({ queryKey: ['budget-status'] })
     qc.invalidateQueries({ queryKey: ['report'] })
     setDraft((d) => { const { [categoryId]: _, ...rest } = d; return rest })
-    toast(Number(val) > 0 ? `${name} capped at Rs ${Number(val).toLocaleString()}` : `${name} budget removed`)
+    toast(Number(val) > 0 ? `${name} capped at ${baseSymbol()} ${Number(val).toLocaleString()}` : `${name} budget removed`)
   }
 
   return (
@@ -62,7 +62,7 @@ export default function Budgets() {
                   )}
                 </div>
                 <InputGroup className="w-36">
-                  <InputGroupAddon>Rs</InputGroupAddon>
+                  <InputGroupAddon>{baseSymbol()}</InputGroupAddon>
                   <InputGroupInput
                     type="number" inputMode="numeric" min="0" placeholder="—"
                     className="amount text-right"

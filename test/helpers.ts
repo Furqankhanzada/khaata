@@ -76,7 +76,7 @@ export async function makeUser(opts: { inviteCode?: string; name?: string } = {}
 
   await json('/api/v1/household', {
     cookie,
-    json: opts.inviteCode ? { invite_code: opts.inviteCode } : { name: `home-${email}`, timezone: 'Asia/Karachi' },
+    json: opts.inviteCode ? { invite_code: opts.inviteCode } : { name: `home-${email}`, timezone: 'Asia/Karachi', base_currency: 'PKR' },
   })
   const keyRes = await json<{ key: string }>('/api/auth/api-key/create', { cookie, json: { name: 'test' } })
   return { email, cookie, key: keyRes.key, userId: user.id }

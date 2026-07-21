@@ -32,6 +32,7 @@ export async function onboard(page: Page) {
   await page.getByRole('button', { name: 'Create account' }).click()
 
   await type(page.getByPlaceholder(/Our Home/), 'E2E Home')
+  await page.getByLabel('Base currency').selectOption('PKR') // keep 'Rs' assertions deterministic
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(page.getByText('Net this month')).toBeVisible()
   return email

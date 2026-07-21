@@ -4,23 +4,23 @@ import { auth } from './auth'
 import { db } from './db/client'
 import { households, user } from './db/schema'
 
-export type Ctx = { userId: string; householdId: string; timezone: string }
-export type AuthEnv = { Variables: { userId: string; householdId: string | null; timezone: string | null } }
+export type Ctx = { userId: string; householdId: string; timezone: string; baseCurrency: string }
+export type AuthEnv = { Variables: { userId: string; householdId: string | null; timezone: string | null; baseCurrency: string | null } }
 
 export function apiKeyFrom(headers: { [k: string]: string | undefined }): string | undefined {
   return headers['x-api-key'] ?? headers['authorization']?.replace(/^Bearer\s+/i, '')
 }
 
-async function householdOf(userId: string): Promise<{ householdId: string | null; timezone: string | null }> {
+async function householdOf(userId: string): Promise<{ householdId: string | null; timezone: string | null; baseCurrency: string | null }> {
   const [row] = await db
-    .select({ householdId: user.householdId, timezone: households.timezone })
+    .select({ householdId: user.householdId, timezone: households.timezone, baseCurrency: households.baseCurrency })
     .from(user)
     .leftJoin(households, eq(user.householdId, households.id))
     .where(eq(user.id, userId))
-  return { householdId: row?.householdId ?? null, timezone: row?.timezone ?? null }
+  return { householdId: row?.householdId ?? null, timezone: row?.timezone ?? null, baseCurrency: row?.baseCurrency ?? null }
 }
 
-export async function ctxFromApiKey(key: string): Promise<{ userId: string; householdId: string | null; timezone: string | null } | null> {
+export async function ctxFromApiKey(key: string): Promise<{ userId: string; householdId: string | null; timezone: string | null; baseCurrency: string | null } | null> {
   const res = await auth.api.verifyApiKey({ body: { key } })
   if (!res.valid || !res.key) return null
   const userId = (res.key as { userId?: string; referenceId?: string }).userId ?? (res.key as { referenceId?: string }).referenceId
@@ -37,6 +37,7 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
     c.set('userId', ctx.userId)
     c.set('householdId', ctx.householdId)
     c.set('timezone', ctx.timezone)
+    c.set('baseCurrency', ctx.baseCurrency)
     return next()
   }
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
@@ -45,6 +46,7 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
   c.set('userId', session.user.id)
   c.set('householdId', hh.householdId)
   c.set('timezone', hh.timezone)
+  c.set('baseCurrency', hh.baseCurrency)
   return next()
 })
 
@@ -55,6 +57,6 @@ export const requireHousehold = createMiddleware<AuthEnv>(async (c, next) => {
   return next()
 })
 
-export function hctx(c: { get: (k: 'userId' | 'householdId' | 'timezone') => string | null }): Ctx {
-  return { userId: c.get('userId')!, householdId: c.get('householdId')!, timezone: c.get('timezone')! }
+export function hctx(c: { get: (k: 'userId' | 'householdId' | 'timezone' | 'baseCurrency') => string | null }): Ctx {
+  return { userId: c.get('userId')!, householdId: c.get('householdId')!, timezone: c.get('timezone')!, baseCurrency: c.get('baseCurrency')! }
 }

@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { db } from './db/client'
 import { user } from './db/schema'
 import { requireAuth, requireHousehold, hctx, type AuthEnv } from './middleware'
-import { isValidTimezone } from './util'
+import { isValidCurrency, isValidTimezone } from './util'
 import * as tx from './services/transactions'
 import * as budgets from './services/budgets'
 import * as reports from './services/reports'
@@ -41,13 +41,13 @@ api.get('/me', async (c) => {
   const [u] = await db.select({ id: user.id, name: user.name, email: user.email, householdId: user.householdId })
     .from(user).where(eq(user.id, c.get('userId')))
   const h = u?.householdId
-    ? await household.getHousehold({ userId: u.id, householdId: u.householdId, timezone: c.get('timezone') ?? 'UTC' })
+    ? await household.getHousehold({ userId: u.id, householdId: u.householdId, timezone: c.get('timezone') ?? 'UTC', baseCurrency: c.get('baseCurrency') ?? 'PKR' })
     : null
   return c.json({ user: u, household: h })
 })
 
 api.post('/household', async (c) => {
-  const body = z.object({ name: z.string().optional(), invite_code: z.string().optional(), timezone: z.string().optional() })
+  const body = z.object({ name: z.string().optional(), invite_code: z.string().optional(), timezone: z.string().optional(), base_currency: z.string().optional() })
     .parse(await c.req.json())
   if (c.get('householdId')) return c.json({ error: 'already in a household' }, 409)
   if (body.invite_code) {
@@ -58,7 +58,10 @@ api.post('/household', async (c) => {
   // required, no product default — the web client sends the device timezone
   if (!body.timezone || !isValidTimezone(body.timezone))
     return c.json({ error: "timezone required — an IANA name like 'Asia/Karachi' or 'America/Chicago'" }, 400)
-  return c.json(await household.createHousehold(c.get('userId'), body.name, body.timezone))
+  // required and immutable afterwards: history is stored converted-to-base at locked rates
+  if (!body.base_currency || !isValidCurrency(body.base_currency))
+    return c.json({ error: "base_currency required — an ISO-4217 code like 'PKR' or 'USD' (cannot be changed later)" }, 400)
+  return c.json(await household.createHousehold(c.get('userId'), body.name, body.timezone, body.base_currency))
 })
 
 // --- everything below needs a household ---
@@ -154,9 +157,9 @@ api.delete('/holdings/:id', async (c) => {
   const row = await portfolio.updateHolding(hctx(c), c.req.param('id'), { units: 0 })
   return row ? c.json(row) : c.json({ error: 'not found' }, 404)
 })
-api.post('/prices', async (c) => c.json(await portfolio.recordPrice(portfolio.priceInput.parse(await c.req.json())), 201))
+api.post('/prices', async (c) => c.json(await portfolio.recordPrice(hctx(c), portfolio.priceInput.parse(await c.req.json())), 201))
 api.post('/prices/refresh', async (c) => c.json(await portfolio.refreshPrices()))
-api.post('/fx/rates', async (c) => c.json(await fx.recordFxRate(fx.fxRateInput.parse(await c.req.json())), 201))
+api.post('/fx/rates', async (c) => c.json(await fx.recordFxRate(hctx(c).baseCurrency, fx.fxRateInput.parse(await c.req.json())), 201))
 
 api.get('/loans', async (c) => c.json(await loans.listLoans(hctx(c), c.req.query('status') as 'open' | 'settled' | undefined)))
 api.post('/loans', async (c) => c.json(await loans.addLoan(hctx(c), loans.loanInput.parse(await c.req.json())), 201))

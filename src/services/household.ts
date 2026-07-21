@@ -13,8 +13,8 @@ const DEFAULT_CATEGORIES: [string, 'expense' | 'income'][] = [
   ['Salary', 'income'], ['Business', 'income'], ['Investment', 'income'], ['Other', 'income'],
 ]
 
-export async function createHousehold(userId: string, name: string, timezone: string) {
-  const [h] = await db.insert(households).values({ name, inviteCode: newInviteCode(), timezone }).returning()
+export async function createHousehold(userId: string, name: string, timezone: string, baseCurrency: string) {
+  const [h] = await db.insert(households).values({ name, inviteCode: newInviteCode(), timezone, baseCurrency }).returning()
   await db.insert(categories).values(DEFAULT_CATEGORIES.map(([n, kind]) => ({ householdId: h.id, name: n, kind })))
   await db.update(user).set({ householdId: h.id }).where(eq(user.id, userId))
   return h

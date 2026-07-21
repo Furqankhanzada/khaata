@@ -2,7 +2,7 @@
 import { toast } from 'sonner'
 import { batch, query, type Stmt } from './db'
 import { bump, getMeta, refresh, setMetaStmt } from './store'
-import { todayApp } from './dates'
+import { appBase, todayApp } from './dates'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>
@@ -30,7 +30,7 @@ async function patchDoc(collection: string, id: string, patch: Row): Promise<Stm
 }
 
 async function fxRateFor(currency?: string, explicit?: number) {
-  if (!currency || currency === 'PKR') return null
+  if (!currency || currency === appBase()) return null
   if (explicit) return explicit
   const rates = await getMeta<{ quote: string; rate: number }[]>('fx_rates')
   return rates?.find((r) => r.quote === currency)?.rate ?? null
@@ -39,7 +39,7 @@ async function fxRateFor(currency?: string, explicit?: number) {
 /** Money fields for a local transaction row, mirroring the server's resolveMoney (fx estimated from cached rates). */
 async function money(b: Row) {
   const rate = await fxRateFor(b.currency, b.fx_rate ? Number(b.fx_rate) : undefined)
-  if (!b.currency || b.currency === 'PKR' || !rate)
+  if (!b.currency || b.currency === appBase() || !rate)
     return { amount: Number(b.amount), originalAmount: null, originalCurrency: null, fxRate: null }
   return { amount: Number(b.amount) * rate, originalAmount: Number(b.amount), originalCurrency: b.currency, fxRate: rate }
 }
@@ -161,12 +161,12 @@ async function applyLocal(method: string, path: string, b: Row): Promise<Stmt[]>
   }
 
   if (p === '/accounts' && method === 'POST') {
-    const rate = (await fxRateFor(b.currency)) ?? (b.currency && b.currency !== 'PKR' ? null : 1)
+    const rate = (await fxRateFor(b.currency)) ?? (b.currency && b.currency !== appBase() ? null : 1)
     const balance = Number(b.balance ?? 0)
     return [{
       sql: 'insert or replace into docs(collection, id, data) values(?,?,?)',
       bind: ['accounts', b.id, JSON.stringify({
-        id: b.id, user_id: me?.id, name: b.name, balance, currency: b.currency ?? 'PKR',
+        id: b.id, user_id: me?.id, name: b.name, balance, currency: b.currency ?? appBase(),
         zakatable: b.zakatable ?? true, visibility: b.visibility ?? 'private',
         rate, rate_as_of: null, base_balance: rate != null ? Math.round(balance * rate * 100) / 100 : null,
       })],
@@ -179,7 +179,7 @@ async function applyLocal(method: string, path: string, b: Row): Promise<Stmt[]>
     if (!row) return []
     const a = { ...JSON.parse(row.data), ...b }
     if (b.balance !== undefined || b.currency !== undefined) {
-      a.rate = a.currency === 'PKR' ? 1 : ((await fxRateFor(a.currency)) ?? a.rate)
+      a.rate = a.currency === appBase() ? 1 : ((await fxRateFor(a.currency)) ?? a.rate)
       a.base_balance = a.rate != null ? Math.round(Number(a.balance) * a.rate * 100) / 100 : null
     }
     return [{ sql: 'update docs set data = ? where collection = ? and id = ?', bind: [JSON.stringify(a), 'accounts', m[1]] }]

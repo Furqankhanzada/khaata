@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTheme } from 'next-themes'
 import { Copy, Plus, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { api, authClient } from '../api'
+import { api, authClient, baseSymbol, symbolFor } from '../api'
+import { appBase } from '../local/dates'
 import { clearLocal } from '../local/store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -140,6 +141,12 @@ function HouseholdSection({ me }: { me: Me }) {
           </select>
           <span className="text-xs text-muted-foreground">Entry dates, budgets and reports follow this clock.</span>
         </Field>
+        <Field>
+          <FieldLabel>Base currency</FieldLabel>
+          <div className="flex min-h-8 items-center rounded-lg border border-input px-2.5 text-sm text-muted-foreground">
+            {h.baseCurrency} — set at creation; amounts are stored in it, so it can't change.
+          </div>
+        </Field>
       </CardContent>
     </Card>
   )
@@ -216,7 +223,7 @@ type Account = {
 function AccountsSection() {
   const qc = useQueryClient()
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: () => api<Account[]>('/accounts') })
-  const [form, setForm] = useState({ name: '', balance: '', currency: 'PKR' })
+  const [form, setForm] = useState({ name: '', balance: '', currency: appBase() })
   const [shared, setShared] = useState(false)
   const [managing, setManaging] = useState<Account | null>(null)
   const inval = () => { qc.invalidateQueries({ queryKey: ['accounts'] }); qc.invalidateQueries({ queryKey: ['zakat'] }) }
@@ -240,10 +247,10 @@ function AccountsSection() {
             <span className="flex flex-col">
               <span className="flex items-center gap-1.5 text-sm">
                 {a.name}
-                {a.currency !== 'PKR' && <Badge variant="secondary" className="amount">{a.currency}</Badge>}
+                {a.currency !== appBase() && <Badge variant="secondary" className="amount">{a.currency}</Badge>}
                 {a.visibility === 'shared' && <Badge variant="outline">shared</Badge>}
               </span>
-              {a.currency !== 'PKR' && (
+              {a.currency !== appBase() && (
                 <span className="text-xs text-muted-foreground">
                   {a.rate != null
                     ? <>@ {a.rate.toFixed(2)} ≈ <Amount value={a.base_balance} className="text-xs" /></>
@@ -260,7 +267,7 @@ function AccountsSection() {
             method: 'POST',
             json: { name: form.name, balance: Number(form.balance || 0), currency: form.currency, visibility: shared ? 'shared' : 'private' },
           })
-          setForm({ name: '', balance: '', currency: 'PKR' }); setShared(false); inval(); toast('Account added')
+          setForm({ name: '', balance: '', currency: appBase() }); setShared(false); inval(); toast('Account added')
         }}>
           <div className="flex gap-2">
             <Input placeholder="Account name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -271,10 +278,10 @@ function AccountsSection() {
                   className="amount bg-transparent text-sm outline-none"
                   value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}
                 >
-                  {CURRENCIES.map((c) => <option key={c} value={c}>{c === 'PKR' ? 'Rs' : c}</option>)}
+                  {CURRENCIES.map((c) => <option key={c} value={c}>{c === appBase() ? symbolFor(c) : c}</option>)}
                 </select>
               </InputGroupAddon>
-              <InputGroupInput type="number" inputMode="decimal" step="any" min="0" placeholder="0" className="amount"
+              <InputGroupInput type="number" inputMode="decimal" step="any" min="0" placeholder="0" aria-label="Opening balance" className="amount"
                 value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} />
             </InputGroup>
             <Button type="submit" variant="outline" size="icon" aria-label="Add account"><Plus /></Button>
@@ -327,7 +334,7 @@ function ManageAccount({ a, onDone }: { a: Account; onDone: () => void }) {
                 className="amount bg-transparent text-sm outline-none"
                 value={currency} onChange={(e) => setCurrency(e.target.value)}
               >
-                {CURRENCIES.map((c) => <option key={c} value={c}>{c === 'PKR' ? 'Rs' : c}</option>)}
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c === appBase() ? symbolFor(c) : c}</option>)}
               </select>
             </InputGroupAddon>
             <InputGroupInput id="account-balance" type="number" inputMode="decimal" step="any" min="0" required className="amount"
@@ -461,7 +468,7 @@ function RecurringSection() {
               onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
           <div className="flex gap-2">
-            <Input type="number" min="1" placeholder="Amount Rs" required className="amount"
+            <Input type="number" min="1" placeholder={`Amount ${baseSymbol()}`} required className="amount"
               value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             <InputGroup className="w-28 shrink-0">
               <InputGroupInput type="number" min="1" max="31" placeholder="Day" required
@@ -520,7 +527,7 @@ function ZakatSection() {
                 <div key={a.name} className="flex justify-between border-t py-1.5">
                   <span>
                     {a.name}
-                    {a.currency && a.currency !== 'PKR' && (
+                    {a.currency && a.currency !== appBase() && (
                       <span className="text-muted-foreground"> (<Amount value={a.native_balance} currency={a.currency} className="text-xs" />)</span>
                     )}
                   </span>
@@ -546,7 +553,7 @@ function ZakatSection() {
           <Field className="flex-1">
             <FieldLabel htmlFor="nisab">Nisab</FieldLabel>
             <InputGroup>
-              <InputGroupAddon>Rs</InputGroupAddon>
+              <InputGroupAddon>{baseSymbol()}</InputGroupAddon>
               <InputGroupInput id="nisab" type="number" min="1" required className="amount"
                 placeholder={z?.nisab_amount ? String(z.nisab_amount) : ''} value={form.nisab}
                 onChange={(e) => setForm({ ...form, nisab: e.target.value })} />

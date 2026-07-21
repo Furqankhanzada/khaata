@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { api } from '../api'
+import { api, baseSymbol } from '../api'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,7 +28,7 @@ function describe(r: AuditRow) {
 
 function summary(detail: AuditRow['detail']) {
   if (!detail) return null
-  const bits = [detail.note, detail.name, detail.category, detail.amount != null && `Rs ${detail.amount}`]
+  const bits = [detail.note, detail.name, detail.category, detail.amount != null && `${baseSymbol()} ${detail.amount}`]
   return bits.filter(Boolean).join(' · ') || null
 }
 

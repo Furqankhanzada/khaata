@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { rupees } from '../api'
+import { baseSymbol } from '../api'
+import { appBase } from '../local/dates'
 import { Switch } from '@/components/ui/switch'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -12,14 +13,16 @@ export const CURRENCIES = ['PKR', 'USD', 'AED', 'MYR', 'TRY', 'SAR', 'EUR', 'GBP
 const foreignFmt = (currency: string) =>
   new Intl.NumberFormat('en', { style: 'currency', currency, maximumFractionDigits: 2 })
 
-/** Ledger amount: IBM Plex Mono, tabular. flow colors it; currency ≠ PKR uses Intl symbols ($1,000). */
+/** Ledger amount: IBM Plex Mono, tabular. flow colors it; currency ≠ household base uses Intl symbols ($1,000). */
 export function Amount({
   value, flow, signed = false, currency, className,
 }: { value: number | string | null | undefined; flow?: 'in' | 'out'; signed?: boolean; currency?: string; className?: string }) {
   if (value == null) return <span className={cn('amount text-muted-foreground', className)}>—</span>
   const n = Number(value)
   const sign = signed ? (flow === 'out' ? '−' : '+') : n < 0 ? '−' : ''
-  const body = currency && currency !== 'PKR' ? foreignFmt(currency).format(Math.abs(n)) : `Rs ${rupees.format(Math.abs(n))}`
+  const body = currency && currency !== appBase()
+    ? foreignFmt(currency).format(Math.abs(n))
+    : `${baseSymbol()} ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 }).format(Math.abs(n))}`
   return (
     <span className={cn('amount', flow === 'in' && 'text-inflow', flow === 'out' && 'text-outflow', className)}>
       {sign}{body}

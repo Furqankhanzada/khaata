@@ -1,6 +1,6 @@
 {
-  "id": "564cdb70-1377-402d-92df-c82c61745f7e",
-  "prevId": "0440cd65-8c32-4e85-ba99-6b646fc06cd1",
+  "id": "a2a77750-ae15-4674-90f5-f9ce63008f64",
+  "prevId": "564cdb70-1377-402d-92df-c82c61745f7e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -919,6 +919,67 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.tags": {
+      "name": "tags",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "household_id": {
+          "name": "household_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "archived": {
+          "name": "archived",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tags_household_id_households_id_fk": {
+          "name": "tags_household_id_households_id_fk",
+          "tableFrom": "tags",
+          "tableTo": "households",
+          "columnsFrom": [
+            "household_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "tags_household_id_name_unique": {
+          "name": "tags_household_id_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "household_id",
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.transactions": {
       "name": "transactions",
       "schema": "",
@@ -977,6 +1038,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "tags": {
+          "name": "tags",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
         "note": {
           "name": "note",
           "type": "text",
@@ -1030,6 +1098,21 @@
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
+          "with": {}
+        },
+        "transactions_tags_idx": {
+          "name": "transactions_tags_idx",
+          "columns": [
+            {
+              "expression": "tags",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
           "with": {}
         }
       },

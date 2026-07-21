@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '../api'
+import { api, baseSymbol } from '../api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -186,7 +186,7 @@ function ManageHolding({ h, onDone }: { h: Holding; onDone: () => void }) {
           <FieldLabel htmlFor="price">Today's price / valuation</FieldLabel>
           <div className="flex gap-2">
             <InputGroup className="flex-1">
-              <InputGroupAddon>Rs</InputGroupAddon>
+              <InputGroupAddon>{baseSymbol()}</InputGroupAddon>
               <InputGroupInput id="price" type="number" step="any" min="0.0001" required className="amount"
                 placeholder={h.price != null ? String(h.price) : 'per unit'} value={price} onChange={(e) => setPrice(e.target.value)} />
             </InputGroup>

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../db/client'
 import { zakatSettings } from '../db/schema'
-import { monthBounds, todayIn } from '../util'
+import { monthBounds, symbolFor, todayIn } from '../util'
 import type { Ctx } from '../middleware'
 import { listTransactions, transactionFilters } from './transactions'
 import { budgetStatus } from './budgets'
@@ -15,10 +15,11 @@ const addDays = (s: string, n: number) => {
   const [y, m, d] = s.split('-').map(Number)
   return ymd(new Date(y, m - 1, d + n))
 }
-const rs = (n: number) => `Rs ${Math.round(n).toLocaleString('en-PK')}`
+
 
 /** Everything an agent needs for a morning summary, in one call. */
 export async function dailyBrief(ctx: Ctx) {
+  const rs = (n: number) => `${symbolFor(ctx.baseCurrency)} ${Math.round(n).toLocaleString('en-PK')}`
   const today = todayIn(ctx.timezone)
   const yesterday = addDays(today, -1)
   const { from, toExclusive } = monthBounds(ctx.timezone)

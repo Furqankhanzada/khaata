@@ -16,6 +16,18 @@ export function clearAppTz() {
 export const appTz = () =>
   cachedTz ?? localStorage.getItem('hh-timezone') ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
+// Household base currency, seeded from the snapshot; 'PKR' only as the pre-sync placeholder.
+let cachedBase: string | null = null
+export function setAppBase(code: string) {
+  cachedBase = code
+  localStorage.setItem('hh-currency', code)
+}
+export function clearAppBase() {
+  cachedBase = null
+  localStorage.removeItem('hh-currency')
+}
+export const appBase = () => cachedBase ?? localStorage.getItem('hh-currency') ?? 'PKR'
+
 /** Today on the household's calendar as YYYY-MM-DD. */
 export const todayApp = () => new Date().toLocaleDateString('en-CA', { timeZone: appTz() })
 

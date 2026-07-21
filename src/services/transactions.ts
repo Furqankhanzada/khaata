@@ -5,7 +5,7 @@ import { db } from '../db/client'
 import { categories, tags, transactions, user } from '../db/schema'
 import { todayIn } from '../util'
 import type { Ctx } from '../middleware'
-import { BASE, currencyCode, latestRate } from './fx'
+import { currencyCode, latestRate } from './fx'
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
 
@@ -23,12 +23,12 @@ export const transactionInput = z.object({
   occurred_on: dateStr.optional().describe('Date YYYY-MM-DD, defaults to today (Pakistan time)'),
 })
 
-/** Foreign entries convert once at entry: amount column is always PKR, original preserved. */
-async function resolveMoney(input: { amount: number; currency?: string; fx_rate?: number }) {
-  if (!input.currency || input.currency === BASE) {
+/** Foreign entries convert once at entry: amount column is always the household base, original preserved. */
+async function resolveMoney(base: string, input: { amount: number; currency?: string; fx_rate?: number }) {
+  if (!input.currency || input.currency === base) {
     return { amount: input.amount.toFixed(2), originalAmount: null, originalCurrency: null, fxRate: null }
   }
-  const rate = input.fx_rate ?? (await latestRate(input.currency))
+  const rate = input.fx_rate ?? (await latestRate(base, input.currency))
   return {
     amount: (input.amount * rate).toFixed(2),
     originalAmount: input.amount.toFixed(2),
@@ -107,7 +107,7 @@ export async function getTransaction(ctx: Ctx, id: string) {
 
 export async function addTransaction(ctx: Ctx, input: z.infer<typeof transactionInput>) {
   const categoryId = await resolveCategoryId(ctx, input.type, input.category_id, input.category)
-  const money = await resolveMoney(input)
+  const money = await resolveMoney(ctx.baseCurrency, input)
   const [row] = await db.insert(transactions).values({
     id: input.id,
     householdId: ctx.householdId,
@@ -148,7 +148,7 @@ export async function updateTransaction(ctx: Ctx, id: string, input: z.infer<typ
     ? await resolveCategoryId(ctx, type, input.category_id, input.category)
     : existing.categoryId
   // re-passing an amount redefines the money (foreign if currency given, else plain PKR)
-  const money = input.amount !== undefined ? await resolveMoney({ amount: input.amount, currency: input.currency, fx_rate: input.fx_rate }) : {}
+  const money = input.amount !== undefined ? await resolveMoney(ctx.baseCurrency, { amount: input.amount, currency: input.currency, fx_rate: input.fx_rate }) : {}
   await db.update(transactions).set({
     type,
     ...money,

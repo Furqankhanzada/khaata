@@ -11,7 +11,7 @@ async function makeUserIn(timezone: string) {
     body: JSON.stringify({ email, password: 'password-123', name: 'TZ Tester' }),
   })
   const cookie = (res.headers.get('set-cookie') ?? '').match(/([^,;\s]*better-auth[^=]*=[^;]+)/)![1]
-  await json('/api/v1/household', { cookie, json: { name: `home-${email}`, timezone } })
+  await json('/api/v1/household', { cookie, json: { name: `home-${email}`, timezone, base_currency: 'PKR' } })
   const keyRes = await json<{ key: string }>('/api/auth/api-key/create', { cookie, json: { name: 'tz' } })
   return { cookie, key: keyRes.key }
 }
@@ -28,9 +28,9 @@ describe('household timezone', () => {
       body: JSON.stringify({ email, password: 'password-123', name: 'T' }),
     })
     const cookie = (res.headers.get('set-cookie') ?? '').match(/([^,;\s]*better-auth[^=]*=[^;]+)/)![1]
-    const missing = await req('/api/v1/household', { cookie, json: { name: 'no-tz-home' } })
+    const missing = await req('/api/v1/household', { cookie, json: { name: 'no-tz-home', base_currency: 'PKR' } })
     expect(missing.status).toBe(400)
-    const invalid = await req('/api/v1/household', { cookie, json: { name: 'bad-tz-home', timezone: 'Mars/Olympus' } })
+    const invalid = await req('/api/v1/household', { cookie, json: { name: 'bad-tz-home', timezone: 'Mars/Olympus', base_currency: 'PKR' } })
     expect(invalid.status).toBe(400)
   })
 
