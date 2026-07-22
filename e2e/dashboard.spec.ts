@@ -4,7 +4,7 @@ import { onboard, hhToday, type } from './util'
 const monthLabel = (shift: number) => {
   const [y, mo] = hhToday().split('-').map(Number) // the household's month (device tz in e2e)
   const m = new Date(y, mo - 1 + shift, 1)
-  return m.toLocaleDateString('en-PK', { month: 'long', year: 'numeric' }).toUpperCase()
+  return m.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }).toUpperCase()
 }
 
 test('month stepper walks back and forward', async ({ page }) => {

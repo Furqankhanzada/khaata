@@ -72,7 +72,7 @@ export default function Activity() {
           <section key={date}>
             <div className="mb-1.5 px-1">
               <Eyebrow>
-                {new Date(date + 'T00:00:00').toLocaleDateString('en-PK', { weekday: 'short', day: 'numeric', month: 'short' })}
+                {new Date(date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
               </Eyebrow>
             </div>
             <Card className="gap-0 py-0">
@@ -90,7 +90,7 @@ export default function Activity() {
                     )}
                   </div>
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {new Date(r.at).toLocaleTimeString('en-PK', { hour: 'numeric', minute: '2-digit' })}
+                    {new Date(r.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                   </span>
                 </div>
               ))}

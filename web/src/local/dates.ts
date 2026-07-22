@@ -60,7 +60,7 @@ export function periodRange(period: Period, offset: number): Range {
   } else if (period === 'month') {
     start = addMonths(new Date(y, m - 1, 1), offset)
     end = addMonths(start, 1)
-    label = `${start.toLocaleDateString('en-PK', { month: 'long' })} ${start.getFullYear()}`
+    label = `${start.toLocaleDateString(undefined, { month: 'long' })} ${start.getFullYear()}`
     step = '7 days'
   } else if (period === 'quarter') {
     start = addMonths(new Date(y, Math.floor((m - 1) / 3) * 3, 1), offset * 3)

@@ -30,7 +30,7 @@ function shiftMonth(m: string, delta: number) {
 }
 
 const monthLabel = (m: string) =>
-  new Date(`${m}-01T00:00:00`).toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
+  new Date(`${m}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 
 export default function Dashboard() {
   const [month, setMonth] = useState(todayLocal().slice(0, 7))

@@ -115,7 +115,7 @@ export default function Transactions() {
             <section key={date} className="flex flex-col gap-3">
               <div className="flex items-baseline justify-between px-1">
                 <Eyebrow className="text-xs font-semibold tracking-[0.06em]">
-                  {new Date(date + 'T00:00:00').toLocaleDateString('en-PK', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {new Date(date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
                 </Eyebrow>
                 {dayOut > 0 && <Amount value={dayOut} flow="out" className="text-xs font-semibold" />}
               </div>
