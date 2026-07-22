@@ -103,9 +103,9 @@ export default function Reports() {
             setApplied({ from, to })
           }}
         >
-          <Input type="date" name="from" required defaultValue={applied?.from} />
+          <Input type="date" name="from" required className="flex-1 basis-32" defaultValue={applied?.from} />
           <span className="text-muted-foreground">–</span>
-          <Input type="date" name="to" required defaultValue={applied?.to} />
+          <Input type="date" name="to" required className="flex-1 basis-32" defaultValue={applied?.to} />
           <Button type="submit" size="sm">Show</Button>
         </form>
       ) : (
