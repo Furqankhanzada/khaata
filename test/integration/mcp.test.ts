@@ -41,4 +41,54 @@ describe('MCP endpoint', () => {
     }, 2)
     expect(JSON.parse(fx.body.result.content[0].text).amount).toBe('5600.00')
   })
+
+  it('advertises tool annotations by convention', async () => {
+    const u = await makeUser()
+    const list = await mcp(u.key, 'tools/list')
+    const by = Object.fromEntries(list.body.result.tools.map((t: { name: string; annotations?: Record<string, boolean> }) => [t.name, t.annotations]))
+    expect(by.list_transactions).toMatchObject({ readOnlyHint: true, openWorldHint: false })
+    expect(by.delete_transaction).toMatchObject({ destructiveHint: true })
+    expect(by.update_loan).toMatchObject({ idempotentHint: true })
+    expect(by.refresh_prices).toMatchObject({ openWorldHint: true })
+  })
+
+  it('paginates list_transactions with total_count', async () => {
+    const u = await makeUser()
+    for (let i = 0; i < 3; i++) {
+      await mcp(u.key, 'tools/call', { name: 'add_transaction', arguments: { type: 'expense', amount: 100, category: 'Food' } }, 10 + i)
+    }
+    const page = await mcp(u.key, 'tools/call', { name: 'list_transactions', arguments: { limit: 2, offset: 0 } }, 20)
+    const p = JSON.parse(page.body.result.content[0].text)
+    expect(p.items).toHaveLength(2)
+    expect(p.total_count).toBe(3)
+    expect(p.has_more).toBe(true)
+    expect(p.next_offset).toBe(2)
+
+    const last = await mcp(u.key, 'tools/call', { name: 'list_transactions', arguments: { limit: 2, offset: 2 } }, 21)
+    const l = JSON.parse(last.body.result.content[0].text)
+    expect(l.items).toHaveLength(1)
+    expect(l.has_more).toBe(false)
+    expect(l.next_offset).toBeNull()
+  })
+
+  it('returns isError for a not-found update instead of a raw error', async () => {
+    const u = await makeUser()
+    const r = await mcp(u.key, 'tools/call', {
+      name: 'update_transaction',
+      arguments: { id: '00000000-0000-0000-0000-000000000000', note: 'x' },
+    })
+    expect(r.body.result.isError).toBe(true)
+    expect(r.body.result.content[0].text).toContain('not found')
+  })
+
+  it('catches a handler throw as isError, not a transport crash', async () => {
+    const u = await makeUser()
+    // add_holding with an instrument that omits the required symbol makes the service throw
+    const r = await mcp(u.key, 'tools/call', {
+      name: 'add_holding',
+      arguments: { units: 1, avg_cost: 10, instrument: { kind: 'stock', name: 'No Symbol Co' } },
+    })
+    expect(r.body.result.isError).toBe(true)
+    expect(r.body.result.content[0].text).toContain('symbol')
+  })
 })

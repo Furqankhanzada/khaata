@@ -97,7 +97,7 @@ describe('tags', () => {
       name: 'add_transaction', arguments: { type: 'expense', amount: 1200, tags: ['meat'] },
     })
     const listed = await mcp(u.key, 'tools/call', { name: 'list_transactions', arguments: { tags: ['meat'] } })
-    const rows = JSON.parse(listed.body.result.content[0].text)
+    const { items: rows } = JSON.parse(listed.body.result.content[0].text)
     expect(rows).toHaveLength(1)
     expect(rows[0].tags).toEqual(['meat'])
 

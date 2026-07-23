@@ -123,7 +123,7 @@ export async function addTransaction(ctx: Ctx, input: z.infer<typeof transaction
   return getTransaction(ctx, row?.id ?? input.id!)
 }
 
-export async function listTransactions(ctx: Ctx, f: z.infer<typeof transactionFilters>) {
+function txConds(ctx: Ctx, f: z.infer<typeof transactionFilters>) {
   const conds = [eq(transactions.householdId, ctx.householdId)]
   if (f.from) conds.push(gte(transactions.occurredOn, f.from))
   if (f.to) conds.push(lte(transactions.occurredOn, f.to))
@@ -136,12 +136,26 @@ export async function listTransactions(ctx: Ctx, f: z.infer<typeof transactionFi
     ilike(user.name, `%${f.q}%`),
     sql`array_to_string(${transactions.tags}, ' ') ilike ${'%' + f.q + '%'}`,
   )!)
+  return conds
+}
+
+export async function listTransactions(ctx: Ctx, f: z.infer<typeof transactionFilters>) {
   return db.select(selection).from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
     .leftJoin(user, eq(transactions.userId, user.id))
-    .where(and(...conds))
+    .where(and(...txConds(ctx, f)))
     .orderBy(desc(transactions.occurredOn), desc(transactions.createdAt))
     .limit(f.limit).offset(f.offset)
+}
+
+/** Paginated view for API/agent callers that need total_count — REST/web keep the bare-array listTransactions. */
+export async function listTransactionsPage(ctx: Ctx, f: z.infer<typeof transactionFilters>) {
+  const items = await listTransactions(ctx, f)
+  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(transactions)
+    .leftJoin(user, eq(transactions.userId, user.id)) // q filter references user.name
+    .where(and(...txConds(ctx, f)))
+  const seen = f.offset + items.length
+  return { items, total_count: n, has_more: seen < n, next_offset: seen < n ? seen : null }
 }
 
 export async function updateTransaction(ctx: Ctx, id: string, input: z.infer<typeof transactionUpdate>) {
