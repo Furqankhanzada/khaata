@@ -9,6 +9,7 @@ const DEFAULT_CATEGORIES: [string, 'expense' | 'income'][] = [
   ['Fuel', 'expense'], ['Utilities', 'expense'], ['Phone/Internet', 'expense'],
   ['Rent', 'expense'], ['Bills/Taxes', 'expense'], ['Health', 'expense'],
   ['Education', 'expense'], ['Shopping', 'expense'], ['Charity', 'expense'],
+  ['Family Support', 'expense'], ['Gifts', 'expense'],
   ['Personal', 'expense'], ['Other', 'expense'],
   ['Salary', 'income'], ['Business', 'income'], ['Investment', 'income'], ['Other', 'income'],
 ]

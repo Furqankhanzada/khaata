@@ -12,6 +12,13 @@ describe('auth + household', () => {
     expect(meKey.user.id).toBe(u.userId)
   })
 
+  it('seeds a new household with the default expense categories, incl. Family Support and Gifts', async () => {
+    const u = await makeUser()
+    const cats = await json('/api/v1/categories', { key: u.key })
+    const expense = cats.filter((c: { kind: string }) => c.kind === 'expense').map((c: { name: string }) => c.name)
+    expect(expense).toEqual(expect.arrayContaining(['Family Support', 'Gifts', 'Groceries']))
+  })
+
   it('rejects bad API keys and missing auth', async () => {
     expect((await req('/api/v1/me', { key: 'not-a-key' })).status).toBe(401)
     expect((await req('/api/v1/transactions')).status).toBe(401)
