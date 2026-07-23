@@ -51,6 +51,6 @@ export const symbolFor = (code: string): string =>
 
 export const baseSymbol = () => symbolFor(appBase())
 
-export const rupees = new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 })
+export const rupees = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
 export const fmt = (n: number | string | null | undefined) =>
   n == null ? '—' : `${baseSymbol()} ${rupees.format(Number(n))}`

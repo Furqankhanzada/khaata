@@ -22,7 +22,7 @@ export function Amount({
   const sign = signed ? (flow === 'out' ? '−' : '+') : n < 0 ? '−' : ''
   const body = currency && currency !== appBase()
     ? foreignFmt(currency).format(Math.abs(n))
-    : `${baseSymbol()} ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 }).format(Math.abs(n))}`
+    : `${baseSymbol()} ${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Math.abs(n))}`
   return (
     <span className={cn('amount', flow === 'in' && 'text-inflow', flow === 'out' && 'text-outflow', className)}>
       {sign}{body}

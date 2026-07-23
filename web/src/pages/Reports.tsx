@@ -38,9 +38,9 @@ const compact = (n: number) =>
 
 function bucketLabel(bucket: string, granularity: Overview['granularity'], period: string) {
   const d = new Date(bucket + 'T00:00:00')
-  if (granularity === 'month') return d.toLocaleDateString('en-PK', { month: 'short' })
-  if (granularity === 'week') return `${d.getDate()} ${d.toLocaleDateString('en-PK', { month: 'short' })}`
-  return period === 'week' ? d.toLocaleDateString('en-PK', { weekday: 'short' }) : String(d.getDate())
+  if (granularity === 'month') return d.toLocaleDateString(undefined, { month: 'short' })
+  if (granularity === 'week') return `${d.getDate()} ${d.toLocaleDateString(undefined, { month: 'short' })}`
+  return period === 'week' ? d.toLocaleDateString(undefined, { weekday: 'short' }) : String(d.getDate())
 }
 
 function DeltaChip({ label, cur, prev, upIsGood }: { label: string; cur: number; prev: number; upIsGood: boolean }) {
@@ -171,7 +171,7 @@ export default function Reports() {
                       <ChartTooltipContent
                         labelFormatter={(_, payload) => {
                           const b = payload?.[0]?.payload?.bucket as string | undefined
-                          return b ? new Date(b + 'T00:00:00').toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+                          return b ? new Date(b + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
                         }}
                       />
                     }
