@@ -43,11 +43,11 @@ export const priceInput = z.object({
   as_of: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Defaults to today'),
 })
 
-export async function searchInstruments(search?: string) {
+export async function searchInstruments(search?: string, limit = 50, offset = 0) {
   const cond = search
     ? or(ilike(instruments.name, `%${search}%`), ilike(instruments.symbol, `%${search}%`), ilike(instruments.mufapFundName, `%${search}%`))
     : undefined
-  return db.select().from(instruments).where(cond).orderBy(instruments.name).limit(50)
+  return db.select().from(instruments).where(cond).orderBy(instruments.name).limit(limit).offset(offset)
 }
 
 export async function createInstrument(input: z.infer<typeof instrumentInput>) {

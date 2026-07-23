@@ -19,24 +19,53 @@ import { isValidTimezone } from './util'
 
 const json = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 1) }] })
 
+/** Thrown by handlers for a missing/invisible row; the wrapper turns it into an isError envelope. */
+class NotFoundError extends Error {}
+const orNotFound = <T>(v: T | null | undefined): T => {
+  if (v == null) throw new NotFoundError('not found')
+  return v
+}
+
+/** MCP tool annotation hints, defaulted by name convention. */
+function defaultAnnotations(name: string) {
+  return {
+    readOnlyHint: /^(list_|get_)/.test(name),
+    destructiveHint: /^delete_/.test(name),
+    idempotentHint: /^(update_|set_)/.test(name),
+    openWorldHint: name === 'refresh_prices', // only tool that reaches external services
+  }
+}
+
 function buildServer(ctx: Ctx) {
   const server = new McpServer({ name: 'hamara-hisaab', version: '1.0.0' })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tool = (name: string, description: string, shape: z.ZodRawShape, handler: (args: any) => Promise<unknown>) =>
-    server.registerTool(name, { description, inputSchema: shape }, async (args) => {
+  const tool = (
+    name: string,
+    description: string,
+    shape: z.ZodRawShape,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handler: (args: any) => Promise<unknown>,
+    annotations = defaultAnnotations(name),
+  ) =>
+    server.registerTool(name, { description, inputSchema: shape, annotations }, async (args) => {
       console.log(`[mcp] user=${ctx.userId} ${name} ${JSON.stringify(args)}`)
-      const result = json(await handler(args))
-      if (!/^(list_|get_)/.test(name)) await audit({ channel: 'mcp', action: name, detail: args, ...ctx })
-      return result
+      try {
+        const result = json(await handler(args))
+        if (!/^(list_|get_)/.test(name)) await audit({ channel: 'mcp', action: name, detail: args, ...ctx })
+        return result
+      } catch (e) {
+        const text = e instanceof Error ? e.message : String(e)
+        console.error(`[mcp] user=${ctx.userId} ${name} error: ${text}`)
+        return { isError: true, content: [{ type: 'text' as const, text }] }
+      }
     })
 
   tool('add_transaction', "Record an expense or income in the household ledger. Amounts are in the household base currency by default; for foreign spending pass currency (e.g. amount: 20, currency: 'USD') — it's converted to the base once at the day's rate (or an explicit fx_rate) and the original is preserved. The payer is the owner of the API key. Split an itemised bill into one transaction per item and tag each with what it was — broad and specific together, e.g. chicken breast → tags ['meat','chicken'].",
     tx.transactionInput.shape, (a) => tx.addTransaction(ctx, a))
-  tool('list_transactions', "List/search household transactions with optional date, type, category, tag, member and text filters. To total what was bought (meat, milk, fruit) use tags — q searches free text and will match unrelated notes, e.g. a 'chicken burger' dining entry is not meat.",
-    tx.transactionFilters.shape, (a) => tx.listTransactions(ctx, tx.transactionFilters.parse(a)))
+  tool('list_transactions', "List/search household transactions with optional date, type, category, tag, member and text filters. Returns { items, total_count, has_more, next_offset } — page with limit/offset (default 50), pass next_offset to continue. To total what was bought (meat, milk, fruit) use tags — q searches free text and will match unrelated notes, e.g. a 'chicken burger' dining entry is not meat.",
+    tx.transactionFilters.shape, (a) => tx.listTransactionsPage(ctx, tx.transactionFilters.parse(a)))
   tool('update_transaction', 'Fix an existing transaction by id (any field).',
     { ...tx.transactionUpdate.shape, id: z.string() },
-    async (a: { id: string }) => (await tx.updateTransaction(ctx, a.id, tx.transactionUpdate.parse(a))) ?? { error: 'not found' })
+    async (a: { id: string }) => orNotFound(await tx.updateTransaction(ctx, a.id, tx.transactionUpdate.parse(a))))
   tool('delete_transaction', 'Delete a transaction by id.',
     { id: z.string() }, async (a: { id: string }) => ({ deleted: await tx.deleteTransaction(ctx, a.id) }))
 
@@ -69,19 +98,20 @@ function buildServer(ctx: Ctx) {
 
   tool('get_portfolio', "Investment holdings visible to you (your own + household-shared) with latest prices/NAVs, value, cost and gain (household base currency). Wealth items are private per member by default; visibility: 'shared' exposes one to the household.",
     {}, () => portfolio.getPortfolio(ctx))
-  tool('list_instruments', 'Search known instruments (global stocks/ETFs/crypto, PSX stocks, mutual funds, other assets).',
-    { search: z.string().optional() }, (a: { search?: string }) => portfolio.searchInstruments(a.search))
+  tool('list_instruments', 'Search known instruments (global stocks/ETFs/crypto, PSX stocks, mutual funds, other assets). This table is global and unbounded — page with limit (default 50, max 100) and offset.',
+    { search: z.string().optional(), limit: z.coerce.number().int().min(1).max(100).default(50), offset: z.coerce.number().int().min(0).default(0) },
+    (a: { search?: string; limit: number; offset: number }) => portfolio.searchInstruments(a.search, a.limit, a.offset))
   tool('add_holding', "Add an investment holding; pass instrument_id, or instrument {kind, symbol|mufap_fund_name, name} to create one. kind 'stock' covers global stocks/ETFs/crypto via Yahoo symbols (AAPL, VOO, BTC-USD).",
     portfolio.holdingInput.shape, (a) => portfolio.addHolding(ctx, portfolio.holdingInput.parse(a)))
   tool('update_holding', 'Adjust units, avg cost, visibility or zakatable flag of a holding after a buy/sell.',
     { holding_id: z.string(), ...portfolio.holdingUpdate.shape },
-    async (a: { holding_id: string }) => (await portfolio.updateHolding(ctx, a.holding_id, portfolio.holdingUpdate.parse(a))) ?? { error: 'not found' })
+    async (a: { holding_id: string }) => orNotFound(await portfolio.updateHolding(ctx, a.holding_id, portfolio.holdingUpdate.parse(a))))
   tool('delete_holding', 'Remove an investment holding from the portfolio (its price history is kept).',
     { holding_id: z.string() },
-    async (a: { holding_id: string }) => (await portfolio.updateHolding(ctx, a.holding_id, { units: 0 })) ?? { error: 'not found' })
+    async (a: { holding_id: string }) => orNotFound(await portfolio.updateHolding(ctx, a.holding_id, { units: 0 })))
   tool('update_instrument', "Rename an investment's display name, e.g. 'Gold jewellery (5 tola)'. Only instruments your household holds can be renamed; the name is shared across the household.",
     { instrument_id: z.string(), ...portfolio.instrumentUpdate.shape },
-    async (a: { instrument_id: string }) => (await portfolio.updateInstrument(ctx, a.instrument_id, portfolio.instrumentUpdate.parse(a))) ?? { error: 'not found' })
+    async (a: { instrument_id: string }) => orNotFound(await portfolio.updateInstrument(ctx, a.instrument_id, portfolio.instrumentUpdate.parse(a))))
   tool('record_price', 'Manually record a price/NAV/valuation for an instrument (wins over auto-fetched prices).',
     portfolio.priceInput.shape, (a) => portfolio.recordPrice(ctx, portfolio.priceInput.parse(a)))
   tool('refresh_prices', 'Fetch latest market data now: global quotes (Yahoo), PSX closing prices, MUFAP fund NAVs, and exchange rates.', {}, () => portfolio.refreshPrices())
@@ -91,7 +121,7 @@ function buildServer(ctx: Ctx) {
     { status: z.enum(['open', 'settled']).optional() }, (a: { status?: 'open' | 'settled' }) => loans.listLoans(ctx, a.status))
   tool('record_loan_payment', 'Record a repayment against a loan (auto-settles when fully repaid).',
     { loan_id: z.string(), ...loans.loanPaymentInput.shape },
-    async (a: { loan_id: string }) => (await loans.addLoanPayment(ctx, a.loan_id, loans.loanPaymentInput.parse(a))) ?? { error: 'not found' })
+    async (a: { loan_id: string }) => orNotFound(await loans.addLoanPayment(ctx, a.loan_id, loans.loanPaymentInput.parse(a))))
   tool('update_loan', 'Settle a loan (any remainder counts as forgiven), reopen it, update its note, or change its visibility.',
     {
       loan_id: z.string(),
@@ -100,19 +130,19 @@ function buildServer(ctx: Ctx) {
       visibility: z.enum(['shared', 'private']).optional(),
     },
     async (a: { loan_id: string; status?: 'open' | 'settled'; note?: string; visibility?: 'shared' | 'private' }) =>
-      (await loans.updateLoan(ctx, a.loan_id, { status: a.status, note: a.note, visibility: a.visibility })) ?? { error: 'not found' })
+      orNotFound(await loans.updateLoan(ctx, a.loan_id, { status: a.status, note: a.note, visibility: a.visibility })))
 
   tool('add_recurring', 'Create a recurring monthly bill/income rule (auto-logged on its due day).',
     recurring.recurringInput.shape, (a) => recurring.addRecurring(ctx, recurring.recurringInput.parse(a)))
   tool('list_recurring', 'List recurring rules.', {}, () => recurring.listRecurring(ctx))
   tool('update_recurring', 'Update or deactivate (active:false) a recurring rule.',
     { ...recurring.recurringUpdate.shape, id: z.string() },
-    async (a: { id: string }) => (await recurring.updateRecurring(ctx, a.id, recurring.recurringUpdate.parse(a))) ?? { error: 'not found' })
+    async (a: { id: string }) => orNotFound(await recurring.updateRecurring(ctx, a.id, recurring.recurringUpdate.parse(a))))
 
   tool('list_accounts', "List cash/bank accounts visible to you (your own + household-shared). Balances are in each account's own currency; base_balance/rate give the PKR value at the latest exchange rate.", {}, () => accounts.listAccounts(ctx))
   tool('update_account_balance', "Update a cash/bank account's balance snapshot (in its own currency) or other fields.",
     { account_id: z.string(), ...accounts.accountUpdate.shape },
-    async (a: { account_id: string }) => (await accounts.updateAccount(ctx, a.account_id, accounts.accountUpdate.parse(a))) ?? { error: 'not found' })
+    async (a: { account_id: string }) => orNotFound(await accounts.updateAccount(ctx, a.account_id, accounts.accountUpdate.parse(a))))
   tool('add_account', "Create a cash/bank account. Use currency for foreign-currency balances (e.g. 'USD' for Payoneer/Upwork).", accounts.accountInput.shape, (a) => accounts.addAccount(ctx, accounts.accountInput.parse(a)))
   tool('delete_account', 'Delete a cash/bank account by id (its balance stops counting toward zakat).',
     { id: z.string() }, async (a: { id: string }) => ({ deleted: await accounts.deleteAccount(ctx, a.id) }))
